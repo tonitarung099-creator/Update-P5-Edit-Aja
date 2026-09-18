@@ -148,6 +148,49 @@ python tools/film_context/film_context.py annotate 214 \
 
 Later optional local semantic/vision engines can populate these notes or add vector indexes without changing the public tool names. No heavy vision model is bundled in Phase 15.
 
+## Optional visual semantic tags
+
+The base Film Context remains lightweight and does not require a vision model. For users who want better visual understanding, Phase 15 can optionally run OpenCLIP **once during indexing**:
+
+```bash
+python tools/film_context/film_context.py visual-index \
+  --index-dir .film-context/movie
+```
+
+This optional command requires `open_clip_torch`, PyTorch and Pillow. They are **not bundled with the base editor**.
+
+The visual index deliberately avoids loading a large model during every AI query:
+
+```text
+movie scenes
+   ↓
+one representative mid-frame per scene
+   ↓
+OpenCLIP once during indexing
+   ↓
+top bilingual semantic tags
+   ↓
+SQLite scene_visual cache
+   ↓
+normal movie_search
+(no vision model loaded)
+```
+
+Examples of persisted tags include:
+
+```text
+person opening a door / orang membuka pintu
+inside a house / dalam rumah
+person crying / orang menangis
+car crash / kecelakaan mobil
+document or letter / dokumen surat
+```
+
+The vocabulary is intentionally recap-oriented and bilingual so Indonesian narration can benefit from the same local search. The OpenCLIP model is only needed when building or rebuilding these tags. After that, normal `movie_search` remains a lightweight SQLite/BM25 lookup over dialogue, notes and cached visual tags.
+
+This is an optional semantic-tag layer, not a mandatory video-language model. A future backend can store richer free-form vectors without changing the existing `movie_*` tool protocol.
+
+
 ## Privacy and API budget
 
 The intended escalation policy is:
