@@ -67,6 +67,10 @@ Update P5 now includes feature engines outside the original Phase 5 AI Agent:
 - **Media Intelligence** — FFprobe metadata, silence detection, scene/shot detection, black-frame detection, loudness measurement, pacing analysis, and smart jump-cut JSON generation.
 - **Caption Intelligence** — SRT/transcript ingestion, phrase captions, word-by-word captions, timing resegmentation, case transforms, and direct native subtitle-batch JSON generation.
 - **Audio Intelligence** — LUFS/true-peak measurement, safety-bounded gain recommendations, native clip-volume normalization, and optional native audio fades.
+- **Dialogue Intelligence** — filler-word, immediate-repeat and long-gap analysis with conservative native ripple-cut plans.
+- **Visual Intelligence** — normalized subject tracks, optional OpenCV face tracking, and editable smart reframe plans for vertical/square/portrait/landscape output.
+- **Documentary Toolkit** — B-roll insertion/placeholders, lower thirds, chapter cards, quote cards and segmented Ken Burns photo motion.
+- **Optional local backends** — whisper.cpp transcription and DeepFilterNet voice cleanup, kept outside the base install.
 
 These engines intentionally feed the same Phase 6 AI Edit/native tool layer rather than introducing another AI agent.
 
