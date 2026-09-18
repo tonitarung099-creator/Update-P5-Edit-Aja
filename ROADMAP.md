@@ -75,3 +75,12 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - AI Edit JSON is a second deterministic control path using the same native registry.
 - Continue using OpenTimelineIO support where suitable for editorial interchange.
 - External analysis/model integrations must be isolated behind adapters and reviewed for code/model licensing before distribution.
+
+## Phase 11 — Creator workflows
+
+- [x] Highlight/social-clip candidate intelligence with reviewable extraction plans.
+- [x] Creator Pipeline orchestration with named artifact passing and final AI Edit composition.
+- [x] Workflow presets for documentary, talking-head, podcast and shorts.
+- [x] AI Asset Manifest for GPT Images/video generation handoff and asset resolution.
+- [ ] Rich native Creator Workspace UI for configuring and running these workflows.
+- [ ] Per-stage progress/cancel controls and visual artifact browser.
