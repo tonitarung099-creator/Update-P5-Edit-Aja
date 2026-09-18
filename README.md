@@ -60,6 +60,16 @@ python tools/ai_edit/update_p5_ai_edit.py apply my-edit.json
 
 The runner creates a project checkpoint before applying edits by default. See `ai-edit/FORMAT.md` for the format, references, variables and selectors.
 
+## New intelligence engines
+
+Update P5 now includes feature engines outside the original Phase 5 AI Agent:
+
+- **Media Intelligence** — FFprobe metadata, silence detection, scene/shot detection, black-frame detection, loudness measurement, pacing analysis, and smart jump-cut JSON generation.
+- **Caption Intelligence** — SRT/transcript ingestion, phrase captions, word-by-word captions, timing resegmentation, case transforms, and direct native subtitle-batch JSON generation.
+- **Audio Intelligence** — LUFS/true-peak measurement, safety-bounded gain recommendations, native clip-volume normalization, and optional native audio fades.
+
+These engines intentionally feed the same Phase 6 AI Edit/native tool layer rather than introducing another AI agent.
+
 ## Roadmap
 
 See `ROADMAP.md`. Planned areas now move beyond the completed native AI Edit import UI into richer change previews, scene/media intelligence, advanced captions and audio cleanup, object tracking/masking/background removal, smart reframe, documentary graphics, and optional analysis/model backends.
