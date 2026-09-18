@@ -9,6 +9,7 @@ on:
       - 'branding/**'
       - 'scripts/**'
       - 'craft/**'
+      - 'tools/film_context/**'
       - 'README.md'
       - 'BUILDING.md'
   workflow_dispatch:
@@ -31,6 +32,7 @@ jobs:
       PHASE12_SHA256: d8729f8d3cbe09e7818d5d5a4ab8cc690a45ac9f6982fdf98d0ded6732665652
       PHASE13_SHA256: 9826b9ec0a5252827cb34b8aa4f4b904a6bcf83c4ec302ad0e6893dd1bc195bc
       PHASE14_SHA256: 864aa6d7aeee21a965df407c1be2b9da7dde744cc065eccb698d7e5fdca7c248
+      PHASE15_SHA256: b8bbd7ebcce8fcc4685aba3df59dfbd8d876d18fe4048d2c59491efdab63e121
       CRAFT_ROOT: C:\CraftRoot
 
     steps:
@@ -45,6 +47,8 @@ jobs:
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase12-local-edit-native.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 12 SHA-256:',h); assert h=='$env:PHASE12_SHA256'; pathlib.Path('craft/editaja/phase12.patch').write_bytes(out)"
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase13-local-edit-scene-undo.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 13 SHA-256:',h); assert h=='$env:PHASE13_SHA256'; pathlib.Path('craft/editaja/phase13.patch').write_bytes(out)"
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase14-local-edit-preview-history.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 14 SHA-256:',h); assert h=='$env:PHASE14_SHA256'; pathlib.Path('craft/editaja/phase14.patch').write_bytes(out)"
+          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase15-film-context-native.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 15 SHA-256:',h); assert h=='$env:PHASE15_SHA256'; pathlib.Path('craft/editaja/phase15.patch').write_bytes(out)"
+          Copy-Item tools/film_context/film_context.py craft/editaja/film_context.py -Force
           Copy-Item patches/build-fixes.patch craft/editaja/build-fixes.patch -Force
           Copy-Item branding/editaja-logo.png.b64 craft/editaja/editaja-logo.png.b64 -Force
           Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.txt -Force
@@ -64,6 +68,9 @@ jobs:
           git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase12.patch"
           git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase13.patch"
           git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase14.patch"
+          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase15.patch"
+          New-Item -ItemType Directory -Force corresponding-source/data/scripts/filmcontext | Out-Null
+          Copy-Item tools/film_context/film_context.py corresponding-source/data/scripts/filmcontext/film_context.py -Force
           python scripts/apply_branding.py corresponding-source --assets branding
           if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Update P5 Edit Aja"\)' -Quiet)) {
             throw 'Update P5 Edit Aja branding verification failed'
@@ -91,6 +98,18 @@ jobs:
           }
           if (-not (Select-String -Path corresponding-source/src/mainwindow.cpp -Pattern 'creatorLocalEditPreview' -Quiet)) {
             throw 'Phase 14 Creator Workspace preview control is missing'
+          }
+          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'Film Context' -Quiet)) {
+            throw 'Phase 15 Film Context optional UI is missing'
+          }
+          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'movie_search' -Quiet)) {
+            throw 'Phase 15 Film Context agent tools are missing'
+          }
+          if (-not (Select-String -Path corresponding-source/src/aiassistant/openaicompatibleagent.cpp -Pattern 'agent_image_paths' -Quiet)) {
+            throw 'Phase 15 multi-keyframe vision handoff is missing'
+          }
+          if (-not (Test-Path corresponding-source/data/scripts/filmcontext/film_context.py)) {
+            throw 'Phase 15 local Film Context backend is missing'
           }
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Remove-Item -Recurse -Force corresponding-source/.git
