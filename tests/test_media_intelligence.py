@@ -46,7 +46,7 @@ class MediaIntelligenceTests(unittest.TestCase):
         silence = [
             {"start_seconds": 1.0, "end_seconds": 3.0},
             {"start_seconds": 3.02, "end_seconds": 5.0},
-            {"start_seconds": 9.5, "end_seconds": 10.0},
+            {"start_seconds": 9.2, "end_seconds": 10.0},
         ]
         got = mod.smart_cut_ranges(
             silence,
