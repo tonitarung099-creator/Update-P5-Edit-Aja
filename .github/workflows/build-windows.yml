@@ -1,4 +1,4 @@
-name: Build Edit Aja for Windows
+name: Build Update P5 Edit Aja for Windows
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: edit-aja-windows
+  group: update-p5-edit-aja-windows
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
       CRAFT_ROOT: C:\CraftRoot
 
     steps:
-      - name: Checkout Edit Aja build repository
+      - name: Checkout Update P5 Edit Aja build repository
         uses: actions/checkout@v4
 
       - name: Reassemble and verify Phase 5 patch
@@ -57,7 +57,7 @@ jobs:
           git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase6.patch"
           python scripts/apply_branding.py corresponding-source --assets branding
           if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Edit Aja"\)' -Quiet)) {
-            throw 'Edit Aja branding verification failed'
+            throw 'Update P5 Edit Aja branding verification failed'
           }
           if (-not (Test-Path corresponding-source/src/aiassistant/aiassistantwidget.cpp)) {
             throw 'Phase 5 AI assistant source is missing'
@@ -67,7 +67,7 @@ jobs:
           }
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Remove-Item -Recurse -Force corresponding-source/.git
-          Compress-Archive -Path corresponding-source/* -DestinationPath artifacts/Edit-Aja-Source.zip -CompressionLevel Optimal
+          Compress-Archive -Path corresponding-source/* -DestinationPath artifacts/Update-P5-Edit-Aja-Source.zip -CompressionLevel Optimal
 
       - name: Bootstrap KDE Craft with MinGW x64
         shell: pwsh
@@ -105,7 +105,7 @@ jobs:
           Set-Content -Path $cfg -Value $text -Encoding UTF8
           Get-Content $cfg | Select-String 'ABI|MakeProgram'
 
-      - name: Install Edit Aja Craft blueprint
+      - name: Install Update P5 Edit Aja Craft blueprint
         shell: pwsh
         run: |
           $kdenliveFile = Get-ChildItem "$env:CRAFT_ROOT" -File -Recurse -Filter kdenlive.py -ErrorAction SilentlyContinue |
@@ -115,10 +115,10 @@ jobs:
           $target = Join-Path $kdenliveFile.Directory.Parent.FullName 'editaja'
           New-Item -ItemType Directory -Force $target | Out-Null
           Copy-Item craft/editaja/* $target -Recurse -Force
-          Write-Host "Edit Aja blueprint: $target"
+          Write-Host "Update P5 Edit Aja blueprint: $target"
           Get-ChildItem $target
 
-      - name: Build and package Edit Aja
+      - name: Build and package Update P5 Edit Aja
         shell: pwsh
         run: |
           $env:PATH = (($env:PATH -split ';') | Where-Object {
@@ -146,11 +146,11 @@ jobs:
           }
           Get-ChildItem artifacts -File | Format-Table Name, Length
 
-      - name: Upload Edit Aja artifacts
+      - name: Upload Update P5 Edit Aja artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Edit-Aja-Windows-x64
+          name: Update-P5-Edit-Aja-Windows-x64
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14
