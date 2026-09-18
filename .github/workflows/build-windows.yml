@@ -37,8 +37,9 @@ jobs:
         shell: pwsh
         run: |
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches'); n=['00','01','02','03','04.00','04.01','04.02','05.00','05.01','05.02']; s=''.join((p/f'phase5.patch.bz2.b64.{x}').read_text() for x in n); out=bz2.decompress(base64.b64decode(s)); h=hashlib.sha256(out).hexdigest(); print('Phase 5 SHA-256:',h); assert h=='$env:PHASE5_SHA256'; pathlib.Path('craft/editaja/phase5.patch').write_bytes(out)"
+          Copy-Item patches/build-fixes.patch craft/editaja/build-fixes.patch -Force
           Copy-Item branding/editaja-logo.png.b64 craft/editaja/editaja-logo.png.b64 -Force
-          Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.py -Force
+          Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.txt -Force
 
       - name: Reconstruct and verify corresponding source
         shell: pwsh
@@ -49,6 +50,8 @@ jobs:
           git -C corresponding-source fetch --depth 1 origin $env:UPSTREAM_COMMIT
           git -C corresponding-source checkout --detach FETCH_HEAD
           git -C corresponding-source apply --ignore-space-change -p2 "$env:GITHUB_WORKSPACE\craft\editaja\phase5.patch"
+          git -C corresponding-source apply --check "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
+          git -C corresponding-source apply "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
           python scripts/apply_branding.py corresponding-source --assets branding
           if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Edit Aja"\)' -Quiet)) {
             throw 'Edit Aja branding verification failed'
@@ -93,15 +96,14 @@ jobs:
           $text = Get-Content $cfg -Raw
           $text = [regex]::Replace($text, '(?m)^ABI\s*=.*$', 'ABI = windows-gcc-x86_64')
           $text = [regex]::Replace($text, '(?m)^MakeProgram\s*=.*$', 'MakeProgram = mingw32-make')
-          $text = [regex]::Replace($text, '(?m)^PATH\s*=.*$', 'PATH =')
           Set-Content -Path $cfg -Value $text -Encoding UTF8
-          Get-Content $cfg | Select-String 'ABI|MakeProgram|PATH'
+          Get-Content $cfg | Select-String 'ABI|MakeProgram'
 
       - name: Install Edit Aja Craft blueprint
         shell: pwsh
         run: |
           $kdenliveFile = Get-ChildItem "$env:CRAFT_ROOT" -File -Recurse -Filter kdenlive.py -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match 'kdemultimedia[\\/]kdenlive[\\/]kdenlive\.py$' } |
+            Where-Object { $_.FullName -match 'kdemultimedia[\/]kdenlive[\/]kdenlive\.py$' } |
             Select-Object -First 1
           if (-not $kdenliveFile) { throw 'Could not locate the Kdenlive Craft blueprint' }
           $target = Join-Path $kdenliveFile.Directory.Parent.FullName 'editaja'
@@ -113,6 +115,12 @@ jobs:
       - name: Build and package Edit Aja
         shell: pwsh
         run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$'
+          }) -join ';'
           python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
 
       - name: Collect Windows package
