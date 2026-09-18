@@ -102,5 +102,6 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] Native timeline context adapter for selection, playhead, tracks and ordered visual clips.
 - [x] Dedicated `kdenlive_set_transform_keyframes` native tool for editable smooth/linear zoom animation.
 - [x] Direct execution adapter from native Local Edit intent to the shared native tool registry.
-- [ ] Scene Detection map integration for semantic `scene N` numbering when footage is still one long clip.
-- [ ] Session command history, single-undo grouping and richer visual interpretation preview.
+- [x] Scene Detection marker map integration for `scene N`, with source-to-timeline range mapping and ordered-clip fallback.
+- [x] Single-undo grouping for multi-snapshot Local Edit zoom jobs.
+- [ ] Session command history and richer visual interpretation preview.
