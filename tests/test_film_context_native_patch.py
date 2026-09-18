@@ -42,7 +42,7 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("filmcontext/film_context.py", self.patch)
         blueprint = (ROOT / "craft" / "editaja" / "editaja.py").read_text(encoding="utf-8")
         self.assertIn('("phase15.patch", 1)', blueprint)
-        self.assertIn("film_context.py", blueprint)
+        self.assertIn("film_context.txt", blueprint)
 
     def test_small_vision_escalation(self):
         self.assertIn("agent_image_paths", self.patch)
@@ -54,7 +54,7 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("PHASE15_SHA256", workflow)
         self.assertIn("phase15-film-context-native.patch.bz2.b64", workflow)
         self.assertIn("craft/editaja/phase15.patch", workflow)
-        self.assertIn("tools/film_context/film_context.py craft/editaja/film_context.py", workflow)
+        self.assertIn("tools/film_context/film_context.py craft/editaja/film_context.txt", workflow)
         self.assertIn("corresponding-source/data/scripts/filmcontext/film_context.py", workflow)
 
     def test_ai_edit_json_stays_separate(self):

@@ -82,7 +82,7 @@ class Package(CraftPackageObject.get("kde").pattern):
 
     def configure(self):
         # Craft has already fetched the pinned source and applied Phase 5, build fixes, Phase 6, Phase 12, Phase 13, Phase 14 and Phase 15 here.
-        film_context_source = self.blueprintDir() / "film_context.py"
+        film_context_source = self.blueprintDir() / "film_context.txt"
         if not film_context_source.exists():
             return False
         film_context_dir = self.sourceDir() / "data" / "scripts" / "filmcontext"

@@ -48,7 +48,7 @@ jobs:
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase13-local-edit-scene-undo.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 13 SHA-256:',h); assert h=='$env:PHASE13_SHA256'; pathlib.Path('craft/editaja/phase13.patch').write_bytes(out)"
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase14-local-edit-preview-history.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 14 SHA-256:',h); assert h=='$env:PHASE14_SHA256'; pathlib.Path('craft/editaja/phase14.patch').write_bytes(out)"
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase15-film-context-native.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 15 SHA-256:',h); assert h=='$env:PHASE15_SHA256'; pathlib.Path('craft/editaja/phase15.patch').write_bytes(out)"
-          Copy-Item tools/film_context/film_context.py craft/editaja/film_context.py -Force
+          Copy-Item tools/film_context/film_context.py craft/editaja/film_context.txt -Force
           Copy-Item patches/build-fixes.patch craft/editaja/build-fixes.patch -Force
           Copy-Item branding/editaja-logo.png.b64 craft/editaja/editaja-logo.png.b64 -Force
           Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.txt -Force
