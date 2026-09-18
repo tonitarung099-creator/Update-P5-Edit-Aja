@@ -56,6 +56,8 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("craft/editaja/phase15.patch", workflow)
         self.assertIn("tools/film_context/film_context.py craft/editaja/film_context.txt", workflow)
         self.assertIn("corresponding-source/data/scripts/filmcontext/film_context.py", workflow)
+        self.assertIn("Patch Craft gettext MinGW libxml2 linking", workflow)
+        self.assertIn('gl_cv_LTLIBXML="$LIBXML2 $LTLIBICONV"', workflow)
 
     def test_ai_edit_json_stays_separate(self):
         docs = (ROOT / "FILM_CONTEXT.md").read_text(encoding="utf-8")
