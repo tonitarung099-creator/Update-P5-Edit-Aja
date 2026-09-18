@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -102,6 +103,46 @@ class FilmContextTests(unittest.TestCase):
             names = [tool["name"] for tool in fc.tool_catalog()["tools"]]
             self.assertIn("movie_get_keyframes", names)
             self.assertIn("movie_get_context", names)
+
+    def test_visual_tags_are_optional_and_searchable_without_openclip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            index = self._index(Path(tmp))
+            conn = sqlite3.connect(index / "movie.db")
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO scene_visual(scene_id,model,pretrained,frame_time,frame_path,tags_text,tags_json)
+                    VALUES (?,?,?,?,?,?,?)
+                    """,
+                    (
+                        1,
+                        "unit-model",
+                        "unit-pretrained",
+                        1.5,
+                        "frame.jpg",
+                        "opening a door ; membuka pintu ; inside a house ; dalam rumah",
+                        "[]",
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            status = fc.status(index)
+            self.assertTrue(status["visual_ready"])
+            self.assertEqual(status["visual_scene_count"], 1)
+
+            result = fc.search_index(index, "membuka pintu", top_k=1)
+            self.assertEqual(result["results"][0]["scene_id"], 1)
+            self.assertIn("membuka pintu", result["results"][0]["visual_tags"])
+
+            scene = fc.get_scene(index, 1)
+            self.assertIn("dalam rumah", scene["scene"]["visual_tags"])
+
+    def test_visual_index_command_is_available_without_importing_openclip(self):
+        parser = fc.build_parser()
+        args = parser.parse_args(["visual-index", "--index-dir", "dummy"])
+        self.assertEqual(args.command, "visual-index")
 
     def test_keyframe_times_avoid_cut_boundaries(self):
         values = [fc._safe_keyframe_time(10.0, 20.0, i, 2) for i in range(2)]
