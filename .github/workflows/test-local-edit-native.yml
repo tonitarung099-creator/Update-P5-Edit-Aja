@@ -1,0 +1,39 @@
+name: Test Native Local Edit Integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "patches/phase12-local-edit-native.patch.bz2.b64"
+      - "craft/editaja/editaja.py"
+      - "tools/local_edit_agent/**"
+      - "tests/test_local_edit_agent.py"
+      - "tests/test_local_edit_native_patch.py"
+      - ".github/workflows/build-windows.yml"
+      - ".github/workflows/test-local-edit-native.yml"
+  pull_request:
+    paths:
+      - "patches/phase12-local-edit-native.patch.bz2.b64"
+      - "craft/editaja/editaja.py"
+      - "tools/local_edit_agent/**"
+      - "tests/test_local_edit_agent.py"
+      - "tests/test_local_edit_native_patch.py"
+      - ".github/workflows/build-windows.yml"
+      - ".github/workflows/test-local-edit-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test lightweight parser and native patch contract
+        run: |
+          python -m unittest tests.test_local_edit_agent -v
+          python -m unittest tests.test_local_edit_native_patch -v
