@@ -15,7 +15,10 @@
       "name": "Media Intelligence",
       "category": "analysis",
       "script": "tools/media_intelligence/media_intelligence.py",
-      "executables": ["ffmpeg", "ffprobe"],
+      "executables": [
+        "ffmpeg",
+        "ffprobe"
+      ],
       "python_modules": []
     },
     {
@@ -23,7 +26,9 @@
       "name": "Rhythm Intelligence",
       "category": "analysis",
       "script": "tools/rhythm_intelligence/rhythm_intelligence.py",
-      "executables": ["ffmpeg"],
+      "executables": [
+        "ffmpeg"
+      ],
       "python_modules": []
     },
     {
@@ -55,7 +60,9 @@
       "name": "Audio Intelligence",
       "category": "audio",
       "script": "tools/audio_intelligence/audio_intelligence.py",
-      "executables": ["ffmpeg"],
+      "executables": [
+        "ffmpeg"
+      ],
       "python_modules": []
     },
     {
@@ -88,7 +95,9 @@
       "category": "visual-backend",
       "script": "tools/visual_intelligence/visual_intelligence.py",
       "executables": [],
-      "python_modules": ["cv2"],
+      "python_modules": [
+        "cv2"
+      ],
       "optional": true
     },
     {
@@ -128,7 +137,10 @@
       "name": "whisper.cpp Local Speech Backend",
       "category": "speech-backend",
       "script": "tools/speech_backends/whispercpp.py",
-      "executables": ["ffmpeg", "whisper-cli"],
+      "executables": [
+        "ffmpeg",
+        "whisper-cli"
+      ],
       "python_modules": [],
       "optional": true
     },
@@ -137,7 +149,10 @@
       "name": "DeepFilterNet Audio Cleanup Backend",
       "category": "audio-backend",
       "script": "tools/audio_backends/deepfilternet.py",
-      "executables": ["ffmpeg", "deep-filter"],
+      "executables": [
+        "ffmpeg",
+        "deep-filter"
+      ],
       "python_modules": [],
       "optional": true
     },
@@ -146,8 +161,15 @@
       "name": "SAM 2 Video Segmentation Backend",
       "category": "visual-backend",
       "script": "tools/segmentation_backends/sam2_video.py",
-      "executables": ["ffmpeg", "ffprobe"],
-      "python_modules": ["torch", "torchvision", "sam2"],
+      "executables": [
+        "ffmpeg",
+        "ffprobe"
+      ],
+      "python_modules": [
+        "torch",
+        "torchvision",
+        "sam2"
+      ],
       "optional": true
     },
     {
@@ -155,7 +177,42 @@
       "name": "Mask Effects",
       "category": "visual",
       "script": "tools/mask_effects/mask_effects.py",
-      "executables": ["ffmpeg", "ffprobe"],
+      "executables": [
+        "ffmpeg",
+        "ffprobe"
+      ],
+      "python_modules": []
+    },
+    {
+      "id": "bad-take-review",
+      "name": "Bad Take Review",
+      "category": "speech",
+      "script": "tools/bad_take_review/bad_take_review.py",
+      "executables": [],
+      "python_modules": []
+    },
+    {
+      "id": "broll-planner",
+      "name": "Transcript B-roll Planner",
+      "category": "editing",
+      "script": "tools/broll_planner/broll_planner.py",
+      "executables": [],
+      "python_modules": []
+    },
+    {
+      "id": "motion-graphics-templates",
+      "name": "Motion Graphics Templates",
+      "category": "graphics",
+      "script": "tools/motion_graphics_templates/motion_graphics_templates.py",
+      "executables": [],
+      "python_modules": []
+    },
+    {
+      "id": "creator-pipeline",
+      "name": "Creator Pipeline",
+      "category": "orchestration",
+      "script": "tools/creator_pipeline/creator_pipeline.py",
+      "executables": [],
       "python_modules": []
     }
   ]
