@@ -9,6 +9,7 @@ on:
       - "tools/local_edit_agent/**"
       - "tests/test_local_edit_agent.py"
       - "tests/test_local_edit_native_patch.py"
+      - "tests/test_local_edit_scene_undo_patch.py"
       - ".github/workflows/build-windows.yml"
       - ".github/workflows/test-local-edit-native.yml"
   pull_request:
@@ -37,3 +38,4 @@ jobs:
         run: |
           python -m unittest tests.test_local_edit_agent -v
           python -m unittest tests.test_local_edit_native_patch -v
+          python -m unittest tests.test_local_edit_scene_undo_patch -v
