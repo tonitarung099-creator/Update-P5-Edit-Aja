@@ -2,11 +2,12 @@
 
 **Update P5 Edit Aja** is the experimental, expanded version of the Edit Aja video editor. It starts from the complete Edit Aja Phase 5 baseline built on Kdenlive/MLT, while the original `Edit-Aja` repository can remain stable.
 
-The project is designed around three editing paths that share the same native timeline foundation:
+The project is designed around four editing paths that share the same native timeline foundation:
 
 1. normal manual editing,
-2. the existing Phase 5 built-in AI Agent / MCP / REST control layer, and
-3. deterministic **AI Edit JSON** files created outside the editor (for example by ChatGPT) and applied to the editable timeline.
+2. the lightweight offline-first **Local Edit Agent** for everyday natural-language timeline commands,
+3. the existing Phase 5 built-in AI Agent / MCP / REST control layer for heavier AI/tool use, and
+4. deterministic **AI Edit JSON** files created outside the editor (for example by ChatGPT) and applied to the editable timeline.
 
 ## Current baseline
 
@@ -59,6 +60,25 @@ python tools/ai_edit/update_p5_ai_edit.py apply my-edit.json
 ```
 
 The runner creates a project checkpoint before applying edits by default. See `ai-edit/FORMAT.md` for the format, references, variables and selectors.
+
+
+## Local Edit Agent
+
+The Local Edit Agent is a lightweight parser/router for commands typed in ordinary Indonesian or mixed editing language. It does not run a large model for normal editing commands.
+
+Examples:
+
+```text
+ptong 5
+hpus sceen 73
+split disini
+semua snapshpt zom 100 ke 111 5 dtk
+```
+
+The local path performs typo normalization, timeline-context resolution, confidence checks and deterministic animation math. Complex semantic requests are routed to the existing API AI agent; external research/actions can be routed to MCP; specialized local work can be routed to whisper.cpp, DeepFilterNet, Demucs, SAM 2 and the other installed engines.
+
+For the snapshot zoom example, 100% to 111% over 5 seconds means a 4.5-second snapshot ends at 109.9%; clips longer than 5 seconds reach 111% at 5 seconds and then hold. See `LOCAL_EDIT_AGENT.md`.
+
 
 ## New intelligence engines
 
