@@ -105,3 +105,19 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] Scene Detection marker map integration for `scene N`, with source-to-timeline range mapping and ordered-clip fallback.
 - [x] Single-undo grouping for multi-snapshot Local Edit zoom jobs.
 - [x] Session command history and visual interpretation preview with separate Preview/Apply controls.
+
+
+## Phase 15 — Optional Film Context
+
+- [x] Keep Film Context separate from AI Edit JSON and timeline execution.
+- [x] Local FFmpeg scene/shot indexing with SQLite cache.
+- [x] Optional SRT/dialogue ingestion mapped to scene time ranges.
+- [x] Compact local BM25 scene retrieval with optional continuity bias.
+- [x] Neighbor-context lookup without exposing the entire film.
+- [x] On-demand keyframe extraction only for requested candidate scenes.
+- [x] Stable JSON tool protocol for Gemini/API adapters.
+- [x] Scene annotation field so later local semantic/vision backends can enrich the same index without changing the protocol.
+- [ ] Native AI Assistant panel for selecting/building a Film Context index.
+- [ ] Direct built-in AI Agent bridge to the Film Context tool protocol.
+- [ ] Optional local multilingual semantic/visual embeddings after dependency/license review.
+- [ ] Vision-frame escalation policy: text first, then a few keyframes, then short clips only when needed.
