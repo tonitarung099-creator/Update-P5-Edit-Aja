@@ -7,7 +7,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PATCH = ROOT / "patches" / "phase15-film-context-native.patch.bz2.b64"
-EXPECTED_SHA256 = "b8bbd7ebcce8fcc4685aba3df59dfbd8d876d18fe4048d2c59491efdab63e121"
+EXPECTED_SHA256 = "7fde03150f2f7163c1b159ff8db2e44996e10a2ffb95dc964490c1ed451ab283"
 
 
 class FilmContextNativePatchTests(unittest.TestCase):
@@ -25,6 +25,8 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("Enable Film Context tools for the AI agent", self.patch)
         self.assertIn("filmContextEnabled", self.patch)
         self.assertIn("Build Index", self.patch)
+        self.assertIn("Build Visual Index (Optional)", self.patch)
+        self.assertIn("filmContextOperation", self.patch)
 
     def test_agent_tool_surface(self):
         for name in (
