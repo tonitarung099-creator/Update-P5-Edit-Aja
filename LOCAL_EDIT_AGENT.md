@@ -119,3 +119,19 @@ semua snapshot zoom 100 ke 111 5 detik
 For complex semantic language, the command is placed into the existing API AI Agent prompt but is **not sent automatically**. External-search wording routes to MCP; specialized local work routes to the relevant local engine.
 
 The current native definition of `scene N` is the Nth ordered visual clip on the active/main video track. When footage has not yet been split into scenes, Local Edit reports that scene detection/splitting is needed rather than pretending it can delete a semantic scene.
+
+
+## Scene numbering
+
+When the user types `hapus scene 73`, Local Edit now first asks the native `kdenlive_get_scene_map` tool for Kdenlive Scene Detection markers named `Scene N`.
+
+- Range markers map directly to detected source scene ranges.
+- Point markers are treated as **cut boundaries**: Scene 1 is source start -> first cut, Scene 2 is first cut -> second cut, and a final synthetic scene is added from the last cut to source end.
+- Source ranges are mapped through the timeline clip's source in/out and speed.
+- If no Scene Detection markers exist, Local Edit falls back to ordered visual clips so already-cut timelines still work.
+
+Deleting a detected scene uses `kdenlive_remove_ranges`, so unlocked timeline tracks ripple together through that scene range.
+
+## Undo grouping
+
+A Local Edit command that applies the same zoom to multiple snapshots is wrapped in a Kdenlive undo macro. The whole job therefore appears as one logical undo operation instead of one Ctrl+Z per snapshot.
