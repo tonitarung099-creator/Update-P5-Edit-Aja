@@ -214,6 +214,30 @@
       "script": "tools/creator_pipeline/creator_pipeline.py",
       "executables": [],
       "python_modules": []
+    },
+    {
+      "id": "highlight-intelligence",
+      "name": "Highlight Intelligence",
+      "category": "editing",
+      "script": "tools/highlight_intelligence/highlight_intelligence.py",
+      "executables": [],
+      "python_modules": []
+    },
+    {
+      "id": "workflow-presets",
+      "name": "Creator Workflow Presets",
+      "category": "orchestration",
+      "script": "tools/workflow_presets/workflow_presets.py",
+      "executables": [],
+      "python_modules": []
+    },
+    {
+      "id": "ai-asset-manifest",
+      "name": "AI Asset Manifest",
+      "category": "assets",
+      "script": "tools/asset_manifest/asset_manifest.py",
+      "executables": [],
+      "python_modules": []
     }
   ]
 }
