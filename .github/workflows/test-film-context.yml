@@ -5,7 +5,11 @@ on:
     branches: [main]
     paths:
       - "tools/film_context/**"
+      - "patches/phase15-film-context-native.patch.bz2.b64"
+      - "craft/editaja/editaja.py"
+      - ".github/workflows/build-windows.yml"
       - "tests/test_film_context.py"
+      - "tests/test_film_context_native_patch.py"
       - "capabilities/registry.json"
       - "FILM_CONTEXT.md"
       - ".github/workflows/test-film-context.yml"
@@ -29,8 +33,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Run Film Context unit tests
-        run: python -m unittest tests.test_film_context -v
+      - name: Run Film Context unit and native integration tests
+        run: |
+          python -m unittest tests.test_film_context -v
+          python -m unittest tests.test_film_context_native_patch -v
       - name: Validate tool catalog
         run: |
           python tools/film_context/film_context.py tool-catalog > /tmp/film-context-tools.json
