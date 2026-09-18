@@ -118,7 +118,7 @@ semua snapshot zoom 100 ke 111 5 detik
 
 For complex semantic language, the command is placed into the existing API AI Agent prompt but is **not sent automatically**. External-search wording routes to MCP; specialized local work routes to the relevant local engine.
 
-The current native definition of `scene N` is the Nth ordered visual clip on the active/main video track. When footage has not yet been split into scenes, Local Edit reports that scene detection/splitting is needed rather than pretending it can delete a semantic scene.
+`scene N` now prefers Kdenlive Scene Detection markers through `kdenlive_get_scene_map`; ordered visual clips are only the fallback when no detected scene markers are available.
 
 
 ## Scene numbering
@@ -135,3 +135,22 @@ Deleting a detected scene uses `kdenlive_remove_ranges`, so unlocked timeline tr
 ## Undo grouping
 
 A Local Edit command that applies the same zoom to multiple snapshots is wrapped in a Kdenlive undo macro. The whole job therefore appears as one logical undo operation instead of one Ctrl+Z per snapshot.
+
+
+## Preview and History
+
+Phase 14 separates understanding from execution:
+
+```text
+type command
+  -> Preview
+  -> inspect what Edit Aja understood
+  -> Apply
+  -> timeline changes
+```
+
+Pressing **Enter** in the Creator Workspace Local Edit field runs Preview, not Apply. The preview can show the resolved cut time, detected scene range, number of affected snapshots, start/target zoom, proportional short-clip endpoint and whether the job is grouped into one Undo.
+
+The AI Assistant panel also keeps a session **Local Edit History** with time, route, original command and outcome. Commands executed from the Creator Workspace toolbar use the same executor, so they appear in the same history.
+
+Previewing an AI/MCP command does not send anything and does not even populate/submit the external agent. Apply may place the command into the existing AI Agent prompt, where the user can review it before any API call.

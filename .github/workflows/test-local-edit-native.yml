@@ -5,11 +5,14 @@ on:
     branches: [main]
     paths:
       - "patches/phase12-local-edit-native.patch.bz2.b64"
+      - "patches/phase13-local-edit-scene-undo.patch.bz2.b64"
+      - "patches/phase14-local-edit-preview-history.patch.bz2.b64"
       - "craft/editaja/editaja.py"
       - "tools/local_edit_agent/**"
       - "tests/test_local_edit_agent.py"
       - "tests/test_local_edit_native_patch.py"
       - "tests/test_local_edit_scene_undo_patch.py"
+      - "tests/test_local_edit_preview_history_patch.py"
       - ".github/workflows/build-windows.yml"
       - ".github/workflows/test-local-edit-native.yml"
   pull_request:
@@ -39,3 +42,4 @@ jobs:
           python -m unittest tests.test_local_edit_agent -v
           python -m unittest tests.test_local_edit_native_patch -v
           python -m unittest tests.test_local_edit_scene_undo_patch -v
+          python -m unittest tests.test_local_edit_preview_history_patch -v

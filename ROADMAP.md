@@ -104,4 +104,4 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] Direct execution adapter from native Local Edit intent to the shared native tool registry.
 - [x] Scene Detection marker map integration for `scene N`, with source-to-timeline range mapping and ordered-clip fallback.
 - [x] Single-undo grouping for multi-snapshot Local Edit zoom jobs.
-- [ ] Session command history and richer visual interpretation preview.
+- [x] Session command history and visual interpretation preview with separate Preview/Apply controls.
