@@ -257,6 +257,18 @@
       "script": "tools/local_edit_agent/local_edit_agent.py",
       "executables": [],
       "python_modules": []
+    },
+    {
+      "id": "film-context",
+      "name": "Film Context",
+      "category": "analysis",
+      "script": "tools/film_context/film_context.py",
+      "executables": [
+        "ffmpeg",
+        "ffprobe"
+      ],
+      "python_modules": [],
+      "optional": true
     }
   ]
 }
