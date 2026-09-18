@@ -21,20 +21,25 @@
 
 Planned as optional analysis backends feeding the same edit-script/native tool layer:
 
-- scene/shot detection (PySceneDetect-style backend),
-- silence/pause analysis and smart jump cuts,
-- motion/activity analysis,
-- filler-word and bad-take markers,
-- pacing analysis,
-- beat analysis.
+- [x] scene/shot detection using FFmpeg scene scores (optional PySceneDetect backend can be added later),
+- [x] silence/pause analysis and smart jump-cut JSON generation,
+- [ ] motion/activity analysis,
+- [ ] filler-word and bad-take markers,
+- [x] pacing analysis from detected scene durations,
+- [ ] beat analysis.
+- [x] black-frame detection.
+- [x] media metadata normalization with FFprobe.
 
 ## Phase 8 — Speech, captions and audio
 
-- optional local whisper.cpp backend alongside existing speech recognition,
-- word-level animated captions and reusable caption presets,
-- speaker-aware transcript workflow,
-- voice cleanup/noise suppression backend such as DeepFilterNet,
-- loudness normalization and auto-ducking.
+- [ ] optional local whisper.cpp backend alongside existing speech recognition,
+- [x] phrase and word-level smart caption segmentation with reusable native subtitle styles,
+- [ ] richer animated typography/caption presets,
+- [ ] speaker-aware transcript workflow,
+- [ ] voice cleanup/noise suppression backend such as DeepFilterNet,
+- [x] LUFS/true-peak analysis and native clip-gain normalization plans,
+- [x] native fade-in/fade-out plan generation,
+- [ ] auto-ducking.
 
 ## Phase 9 — Visual intelligence
 
