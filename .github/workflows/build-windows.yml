@@ -34,7 +34,7 @@ jobs:
       - name: Checkout Update P5 Edit Aja build repository
         uses: actions/checkout@v4
 
-      - name: Reassemble and verify Phase 5 patch
+      - name: Reassemble and verify source patches
         shell: pwsh
         run: |
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches'); n=['00','01','02','03','04.00','04.01','04.02','05.00','05.01','05.02']; s=''.join((p/f'phase5.patch.bz2.b64.{x}').read_text() for x in n); out=bz2.decompress(base64.b64decode(s)); h=hashlib.sha256(out).hexdigest(); print('Phase 5 SHA-256:',h); assert h=='$env:PHASE5_SHA256'; pathlib.Path('craft/editaja/phase5.patch').write_bytes(out)"
@@ -76,7 +76,8 @@ jobs:
             $_ -and
             $_ -notmatch '(?i)\\Git\\bin$' -and
             $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$'
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
           }) -join ';'
 
           New-Item -ItemType Directory -Force "$env:CRAFT_ROOT\download" | Out-Null
@@ -98,7 +99,9 @@ jobs:
           python $bootstrap --prefix $env:CRAFT_ROOT --branch master --use-defaults
 
           $cfg = Join-Path $env:CRAFT_ROOT 'etc\CraftSettings.ini'
-          if (-not (Test-Path $cfg)) { throw "Craft settings not found: $cfg" }
+          if (-not (Test-Path $cfg)) {
+            throw "Craft settings not found: $cfg"
+          }
           $text = Get-Content $cfg -Raw
           $text = [regex]::Replace($text, '(?m)^ABI\s*=.*$', 'ABI = windows-gcc-x86_64')
           $text = [regex]::Replace($text, '(?m)^MakeProgram\s*=.*$', 'MakeProgram = mingw32-make')
@@ -110,130 +113,44 @@ jobs:
         run: |
           $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
             Select-Object -First 1
-          if (-not $blueprintRoot) { throw 'Could not locate the KDE Craft blueprint root' }
+          if (-not $blueprintRoot) {
+            throw 'Could not locate the KDE Craft blueprint root'
+          }
           $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
           New-Item -ItemType Directory -Force $target | Out-Null
           Copy-Item craft/editaja/* $target -Recurse -Force
           Write-Host "Update P5 Edit Aja blueprint: $target"
           Get-ChildItem $target
 
-      - name: Build and package Update P5 Edit Aja
+      - name: Build Update P5 Edit Aja
         shell: pwsh
         run: |
           $env:PATH = (($env:PATH -split ';') | Where-Object {
             $_ -and
-            $_ -notmatch '(?i)\\Git\\bin
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
- -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
- -and
-            $_ -notmatch '(?i)\\mingw64\\bin
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
- -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
-
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
           }) -join ';'
           python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Package Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
           python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: Collect Windows package
         if: always()
