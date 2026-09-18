@@ -1,0 +1,31 @@
+name: Test Demucs Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/audio_backends/demucs.py'
+      - 'tests/test_demucs_backend.py'
+      - 'DEMUCS_BACKEND.md'
+      - '.github/workflows/test-demucs-backend.yml'
+  pull_request:
+    paths:
+      - 'tools/audio_backends/demucs.py'
+      - 'tests/test_demucs_backend.py'
+      - 'DEMUCS_BACKEND.md'
+      - '.github/workflows/test-demucs-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m py_compile tools/audio_backends/demucs.py
+      - run: python -m unittest tests.test_demucs_backend -v
