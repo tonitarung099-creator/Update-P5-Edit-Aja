@@ -7,7 +7,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PATCH = ROOT / "patches" / "phase15-film-context-native.patch.bz2.b64"
-EXPECTED_SHA256 = "7fde03150f2f7163c1b159ff8db2e44996e10a2ffb95dc964490c1ed451ab283"
+EXPECTED_SHA256 = "a8dc28c9e679d65d0551f997515ee0603983e373d1ab545def8d7fd5593e217a"
 
 
 class FilmContextNativePatchTests(unittest.TestCase):
