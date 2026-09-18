@@ -24,7 +24,8 @@ Planned as optional analysis backends feeding the same edit-script/native tool l
 - [x] scene/shot detection using FFmpeg scene scores (optional PySceneDetect backend can be added later),
 - [x] silence/pause analysis and smart jump-cut JSON generation,
 - [ ] motion/activity analysis,
-- [ ] filler-word and bad-take markers,
+- [x] filler-word, immediate-repeat and long-gap dialogue analysis,
+- [ ] semantic bad-take detection/review,
 - [x] pacing analysis from detected scene durations,
 - [ ] beat analysis.
 - [x] black-frame detection.
@@ -32,32 +33,35 @@ Planned as optional analysis backends feeding the same edit-script/native tool l
 
 ## Phase 8 — Speech, captions and audio
 
-- [ ] optional local whisper.cpp backend alongside existing speech recognition,
+- [x] optional local whisper.cpp backend alongside existing speech recognition,
 - [x] phrase and word-level smart caption segmentation with reusable native subtitle styles,
 - [ ] richer animated typography/caption presets,
 - [ ] speaker-aware transcript workflow,
-- [ ] voice cleanup/noise suppression backend such as DeepFilterNet,
+- [x] optional DeepFilterNet voice cleanup/noise suppression backend,
 - [x] LUFS/true-peak analysis and native clip-gain normalization plans,
 - [x] native fade-in/fade-out plan generation,
 - [ ] auto-ducking.
 
 ## Phase 9 — Visual intelligence
 
-- object/face tracking,
-- masks and subject isolation,
-- background removal/blur,
-- smart reframe for 16:9, 9:16 and 1:1,
-- optional SAM 2-style segmentation backend.
+- [x] normalized subject-track interchange format,
+- [x] optional OpenCV face tracking backend,
+- [ ] richer object tracking backend,
+- [ ] masks and subject isolation,
+- [ ] background removal/blur,
+- [x] smart reframe planner for vertical, square, portrait and landscape outputs,
+- [ ] optional SAM 2-style segmentation backend.
 
 GPU-heavy models should remain optional modules rather than mandatory editor dependencies.
 
 ## Phase 10 — Documentary/creator graphics
 
-- B-roll placeholders and asset slots,
-- map/timeline/chart graphics,
-- quote/source cards and lower thirds,
-- Ken Burns/photo motion presets,
-- reusable documentary motion-graphics templates.
+- [x] B-roll insertion and placeholders/asset slots,
+- [ ] map/timeline/chart graphics,
+- [x] quote/source cards and lower thirds,
+- [x] chapter cards,
+- [x] editable Ken Burns/photo motion presets,
+- [ ] reusable advanced documentary motion-graphics templates.
 
 ## Interchange and architecture
 
