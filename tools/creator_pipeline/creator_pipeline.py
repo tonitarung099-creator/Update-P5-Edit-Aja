@@ -218,7 +218,7 @@ def execute_pipeline(
         final_plan_path.write_text(json.dumps(final, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         context["final_plan"] = str(final_plan_path)
 
-    success = all(x["status"] in {"success", "disabled", "optional_failed"} for x in report_stages)
+    success = all(x["status"] in {"success", "planned", "disabled", "optional_failed"} for x in report_stages)
     return {
         "format": "update-p5-creator-pipeline-report",
         "version": 1,
