@@ -56,6 +56,9 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("craft/editaja/phase15.patch", workflow)
         self.assertIn("tools/film_context/film_context.py craft/editaja/film_context.txt", workflow)
         self.assertIn("corresponding-source/data/scripts/filmcontext/film_context.py", workflow)
+        self.assertIn("Prebuild gettext with explicit libxml2 link", workflow)
+        self.assertIn('$env:LIBS = "-lxml2"', workflow)
+        self.assertIn("--ci-mode libs/gettext", workflow)
         self.assertIn("Patch Craft gettext MinGW libxml2 linking", workflow)
         self.assertIn("LIBS=-lxml2", workflow)
 
