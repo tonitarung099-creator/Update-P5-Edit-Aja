@@ -119,6 +119,7 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] Scene annotation field so later local semantic/vision backends can enrich the same index without changing the protocol.
 - [x] Native AI Assistant panel for selecting/building a Film Context index.
 - [x] Direct built-in AI Agent bridge to the Film Context tool protocol.
-- [ ] Optional local multilingual semantic/visual embeddings after dependency/license review.
+- [x] Optional OpenCLIP semantic visual tagging with bilingual Indonesian/English cached tags; heavy dependencies remain unbundled.
+- [ ] Richer free-form vector retrieval backend after model/dependency review.
 - [x] Text-first vision escalation to a few requested keyframes, capped at six images per tool call when vision attachment is enabled.
 - [ ] Short-clip motion escalation only when still frames are insufficient.
