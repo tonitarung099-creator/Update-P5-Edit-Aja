@@ -85,3 +85,21 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] AI Asset Manifest for GPT Images/video generation handoff and asset resolution.
 - [ ] Rich native Creator Workspace UI for configuring and running these workflows.
 - [ ] Per-stage progress/cancel controls and visual artifact browser.
+
+
+## Phase 12 — Lightweight Local Edit Agent
+
+- [x] Offline-first natural-language command interpreter with no LLM required for normal commands.
+- [x] Indonesian/English shorthand plus conservative fuzzy typo correction and user alias dictionary.
+- [x] Timeline-aware intent model for playhead, selected clip, scene indexes and snapshot collections.
+- [x] Deterministic split/delete intent parsing with confidence and confirmation metadata.
+- [x] Animation math engine for proportional snapshot zoom (for example 100% to 111% at 5 seconds; a 4.5-second snapshot ends at 109.9%).
+- [x] Long snapshot behavior: reach target at the requested time, then hold.
+- [x] Command routing: LOCAL / LOCAL_TOOL / AI / MCP.
+- [x] Route specialized local work to existing engines instead of a general local LLM.
+- [x] Unit tests and CI.
+- [ ] Native Local Edit command bar in the Filmora-like workspace.
+- [ ] Native timeline context adapter (selection/playhead/scene map) feeding the interpreter automatically.
+- [ ] Dedicated transform-keyframe native tool for parameter-specific smooth zoom/pan animation.
+- [ ] Direct execution adapter from validated Local Edit intent to the shared native tool registry.
+- [ ] Session command history, undo grouping and visual interpretation preview.
