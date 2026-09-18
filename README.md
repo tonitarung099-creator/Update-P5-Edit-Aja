@@ -23,7 +23,7 @@ The internal `kdenlive_*` names intentionally remain for Phase 5 API compatibili
 
 ## Phase 6: AI Edit JSON
 
-The first Update P5 feature is now under `tools/ai_edit/` and `ai-edit/`.
+The first Update P5 feature is implemented both as developer tooling under `tools/ai_edit/` / `ai-edit/` and as a native editor UI applied by the Phase 6 source patch.
 
 A JSON edit file can call the existing Phase 5 registry directly, reference values returned by earlier steps, resolve a live track, or find the clip covering a timeline time. This means an external AI can make editing decisions while Update P5 Edit Aja remains the deterministic executor.
 
@@ -49,7 +49,9 @@ Validate an edit file:
 python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/documentary-basic.json
 ```
 
-With Update P5 Edit Aja running and the AI Agent panel opened, inspect the live catalog or apply a plan:
+Inside the application, use the **AI Edit JSON** button in the Creator Workspace (or the AI Assistant panel) to choose a JSON file, preview/validate it, and apply it directly to the editable timeline. Missing asset variables can be resolved with native file pickers.
+
+For developer/automation use, with Update P5 Edit Aja running and the AI Agent panel opened, inspect the live catalog or apply a plan from the command line:
 
 ```text
 python tools/ai_edit/update_p5_ai_edit.py catalog
@@ -60,7 +62,7 @@ The runner creates a project checkpoint before applying edits by default. See `a
 
 ## Roadmap
 
-See `ROADMAP.md`. Planned areas include native AI Edit import UI, scene/media intelligence, advanced captions and audio cleanup, object tracking/masking/background removal, smart reframe, documentary graphics, and additional optional analysis/model backends.
+See `ROADMAP.md`. Planned areas now move beyond the completed native AI Edit import UI into richer change previews, scene/media intelligence, advanced captions and audio cleanup, object tracking/masking/background removal, smart reframe, documentary graphics, and optional analysis/model backends.
 
 ## Upstream and license
 
