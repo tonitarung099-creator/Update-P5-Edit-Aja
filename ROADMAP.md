@@ -23,11 +23,12 @@ Planned as optional analysis backends feeding the same edit-script/native tool l
 
 - [x] scene/shot detection using FFmpeg scene scores (optional PySceneDetect backend can be added later),
 - [x] silence/pause analysis and smart jump-cut JSON generation,
-- [ ] motion/activity analysis,
+- [x] motion/activity analysis,
 - [x] filler-word, immediate-repeat and long-gap dialogue analysis,
 - [ ] semantic bad-take detection/review,
 - [x] pacing analysis from detected scene durations,
-- [ ] beat analysis.
+- [x] beat analysis and native beat-synced cut planning.
+- [x] beat-synced Smart Montage builder.
 - [x] black-frame detection.
 - [x] media metadata normalization with FFprobe.
 
@@ -35,33 +36,34 @@ Planned as optional analysis backends feeding the same edit-script/native tool l
 
 - [x] optional local whisper.cpp backend alongside existing speech recognition,
 - [x] phrase and word-level smart caption segmentation with reusable native subtitle styles,
-- [ ] richer animated typography/caption presets,
-- [ ] speaker-aware transcript workflow,
+- [x] editable animated word/title caption presets (clean/pop/punch/bounce),
+- [x] speaker-aware transcript/caption workflow,
 - [x] optional DeepFilterNet voice cleanup/noise suppression backend,
 - [x] LUFS/true-peak analysis and native clip-gain normalization plans,
 - [x] native fade-in/fade-out plan generation,
-- [ ] auto-ducking.
+- [x] native music auto-ducking under speech.
 
 ## Phase 9 — Visual intelligence
 
 - [x] normalized subject-track interchange format,
 - [x] optional OpenCV face tracking backend,
-- [ ] richer object tracking backend,
-- [ ] masks and subject isolation,
-- [ ] background removal/blur,
+- [x] optional SAM 2/SAM 2.1 video object segmentation/tracking backend,
+- [x] portable mask-track format and subject isolation,
+- [x] transparent foreground, background blur, object blur and background replacement,
 - [x] smart reframe planner for vertical, square, portrait and landscape outputs,
-- [ ] optional SAM 2-style segmentation backend.
+- [x] optional SAM 2-style segmentation backend.
 
 GPU-heavy models should remain optional modules rather than mandatory editor dependencies.
 
 ## Phase 10 — Documentary/creator graphics
 
 - [x] B-roll insertion and placeholders/asset slots,
-- [ ] map/timeline/chart graphics,
+- [x] map/timeline/bar/line SVG graphics,
 - [x] quote/source cards and lower thirds,
 - [x] chapter cards,
 - [x] editable Ken Burns/photo motion presets,
 - [ ] reusable advanced documentary motion-graphics templates.
+- [x] beat-synced B-roll / AI-image Smart Montage.
 
 ## Interchange and architecture
 
