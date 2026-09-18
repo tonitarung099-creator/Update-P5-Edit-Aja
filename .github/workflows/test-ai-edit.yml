@@ -1,0 +1,35 @@
+name: Test AI Edit JSON
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ai_edit/**'
+      - 'ai-edit/**'
+      - 'tests/test_ai_edit.py'
+      - '.github/workflows/test-ai-edit.yml'
+  pull_request:
+    paths:
+      - 'tools/ai_edit/**'
+      - 'ai-edit/**'
+      - 'tests/test_ai_edit.py'
+      - '.github/workflows/test-ai-edit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile runner
+        run: python -m py_compile tools/ai_edit/update_p5_ai_edit.py
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate bundled example
+        run: python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/documentary-basic.json
