@@ -108,11 +108,10 @@ jobs:
       - name: Install Update P5 Edit Aja Craft blueprint
         shell: pwsh
         run: |
-          $kdenliveFile = Get-ChildItem "$env:CRAFT_ROOT" -File -Recurse -Filter kdenlive.py -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match 'kdemultimedia[\/]kdenlive[\/]kdenlive\.py$' } |
+          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
             Select-Object -First 1
-          if (-not $kdenliveFile) { throw 'Could not locate the Kdenlive Craft blueprint' }
-          $target = Join-Path $kdenliveFile.Directory.Parent.FullName 'editaja'
+          if (-not $blueprintRoot) { throw 'Could not locate the KDE Craft blueprint root' }
+          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
           New-Item -ItemType Directory -Force $target | Out-Null
           Copy-Item craft/editaja/* $target -Recurse -Force
           Write-Host "Update P5 Edit Aja blueprint: $target"
