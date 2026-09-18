@@ -16,7 +16,7 @@ class subinfo(info.infoclass):
         # url|branch|revision: an empty branch plus the full SHA pins the exact
         # upstream source used when Phase 5 was created.
         self.svnTargets["editaja"] = f"https://github.com/KDE/kdenlive.git||{UPSTREAM_COMMIT}"
-        self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1)]
+        self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1), ("phase12.patch", 1)]
         self.defaultTarget = "editaja"
         self.description = "Expanded AI-assisted video editor based on Edit Aja and Kdenlive"
         self.webpage = "https://github.com/tonitarung099-creator/Update-P5-Edit-Aja"
@@ -80,7 +80,7 @@ class Package(CraftPackageObject.get("kde").pattern):
         ]
 
     def configure(self):
-        # Craft has already fetched the pinned source and applied Phase 5, build fixes and Phase 6 here.
+        # Craft has already fetched the pinned source and applied Phase 5, build fixes, Phase 6 and Phase 12 here.
         marker = self.sourceDir() / "EDIT_AJA_BRANDING.md"
         if not marker.exists():
             script = self.blueprintDir() / "apply_branding.txt"

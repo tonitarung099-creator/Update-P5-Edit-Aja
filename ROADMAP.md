@@ -98,8 +98,9 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] Command routing: LOCAL / LOCAL_TOOL / AI / MCP.
 - [x] Route specialized local work to existing engines instead of a general local LLM.
 - [x] Unit tests and CI.
-- [ ] Native Local Edit command bar in the Filmora-like workspace.
-- [ ] Native timeline context adapter (selection/playhead/scene map) feeding the interpreter automatically.
-- [ ] Dedicated transform-keyframe native tool for parameter-specific smooth zoom/pan animation.
-- [ ] Direct execution adapter from validated Local Edit intent to the shared native tool registry.
-- [ ] Session command history, undo grouping and visual interpretation preview.
+- [x] Native Local Edit command bar in the Creator/Filmora-like workspace and AI Assistant.
+- [x] Native timeline context adapter for selection, playhead, tracks and ordered visual clips.
+- [x] Dedicated `kdenlive_set_transform_keyframes` native tool for editable smooth/linear zoom animation.
+- [x] Direct execution adapter from native Local Edit intent to the shared native tool registry.
+- [ ] Scene Detection map integration for semantic `scene N` numbering when footage is still one long clip.
+- [ ] Session command history, single-undo grouping and richer visual interpretation preview.

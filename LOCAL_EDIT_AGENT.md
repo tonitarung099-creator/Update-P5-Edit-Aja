@@ -85,7 +85,7 @@ For a snapshot that is only 4.5 seconds:
 
 So its generated animation ends at 109.9%. A snapshot longer than 5 seconds reaches 111% at 5 seconds, then holds 111% for the rest of the clip. Snapshot/photo animation defaults to smooth easing.
 
-The interpreter emits explicit keyframe math as portable command IR. The current native registry has static transform plus generic effect-keyframe primitives; a dedicated transform-keyframe adapter is the intended final executor for parameter-specific smooth scale animation.
+The interpreter emits explicit keyframe math as portable command IR. Phase 12 adds the native `kdenlive_set_transform_keyframes` executor, which writes editable qtblend/Transform keyframes and supports smooth or linear scale animation, proportional short-clip endpoints, and target-then-hold behavior.
 
 ## CLI
 
@@ -100,3 +100,22 @@ No third-party Python package is required for the normal parser.
 ## Safety/UX rule
 
 High-confidence deterministic commands may be configured for direct execution. Ambiguous or destructive commands should show the normalized interpretation first. Unknown language never guesses a native edit: it routes to the configured AI/MCP path instead.
+
+
+## Native command bar
+
+Phase 12 adds a **Local Edit** command field directly to the Creator Workspace toolbar and to the AI Assistant panel. The native command path reads the live timeline state and executes safe deterministic commands through the same shared native registry.
+
+Examples:
+
+```text
+ptong 5
+potong menit 5
+split disini
+hpus sceen 73
+semua snapshot zoom 100 ke 111 5 detik
+```
+
+For complex semantic language, the command is placed into the existing API AI Agent prompt but is **not sent automatically**. External-search wording routes to MCP; specialized local work routes to the relevant local engine.
+
+The current native definition of `scene N` is the Nth ordered visual clip on the active/main video track. When footage has not yet been split into scenes, Local Edit reports that scene detection/splitting is needed rather than pretending it can delete a semantic scene.

@@ -47,6 +47,14 @@ class LocalEditAgentTests(unittest.TestCase):
         self.assertAlmostEqual(result["parameters"]["animations"][0]["end_scale_percent"], 109.9)
         self.assertEqual(result["parameters"]["animations"][1]["end_scale_percent"], 111)
 
+    def test_zoom_routes_to_native_transform_keyframes(self):
+        result = interpret(
+            "snapshot zoom 100 ke 111 5 dtk",
+            context={"selected_clip_id": 44, "selected_clip_duration": 4.5},
+        )
+        self.assertEqual(result["native_tool_hint"], "kdenlive_set_transform_keyframes")
+        self.assertAlmostEqual(result["parameters"]["animations"][0]["end_scale_percent"], 109.9)
+
     def test_specialized_local_tool_route(self):
         self.assertEqual(interpret("transkrip video ini lalu buat subtitle")["route"], "local_tool")
 
