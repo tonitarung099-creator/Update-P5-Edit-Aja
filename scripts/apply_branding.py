@@ -72,12 +72,12 @@ def apply(root: Path, asset_dir: Path) -> None:
     replace(
         main,
         'QString otherText = i18n("Please report bugs to <a href=\\"%1\\">%2</a>", QStringLiteral("https://bugs.kde.org/enter_bug.cgi?product=kdenlive"),\n                             QStringLiteral("https://bugs.kde.org/"));',
-        'QString otherText = i18n("Update P5 Edit Aja is an open-source fork based on Kdenlive. Source and project issues: <a href=\\"%1\\">%1</a>",\n                             QStringLiteral("https://github.com/tonitarung099-creator/Edit-Aja"));',
+        'QString otherText = i18n("Update P5 Edit Aja is an open-source fork based on Kdenlive. Source and project issues: <a href=\\"%1\\">%1</a>",\n                             QStringLiteral("https://github.com/tonitarung099-creator/Update-P5-Edit-Aja"));',
     )
     replace(
         main,
         'KAboutData aboutData(QByteArray("kdenlive"), i18n("Kdenlive"), KDENLIVE_VERSION, i18n("An open source video editor."), KAboutLicense::GPL_V3,\n                         i18n("Copyright © 2007–2025 Kdenlive authors"), otherText, QStringLiteral("https://kdenlive.org"));',
-        'KAboutData aboutData(QByteArray("kdenlive"), i18n("Update P5 Edit Aja"), KDENLIVE_VERSION, i18n("Open-source AI-assisted video editor based on Kdenlive."), KAboutLicense::GPL_V3,\n                         i18n("Kdenlive core © 2007–2026 Kdenlive authors; Update P5 Edit Aja modifications © 2026 Update P5 Edit Aja contributors"), otherText,\n                         QStringLiteral("https://github.com/tonitarung099-creator/Edit-Aja"));',
+        'KAboutData aboutData(QByteArray("kdenlive"), i18n("Update P5 Edit Aja"), KDENLIVE_VERSION, i18n("Open-source AI-assisted video editor based on Kdenlive."), KAboutLicense::GPL_V3,\n                         i18n("Kdenlive core © 2007–2026 Kdenlive authors; Update P5 Edit Aja modifications © 2026 Update P5 Edit Aja contributors"), otherText,\n                         QStringLiteral("https://github.com/tonitarung099-creator/Update-P5-Edit-Aja"));',
     )
     # Preserve upstream author/credit history and add fork attribution.
     marker = '    aboutData.addCredit(i18n("Massimo Stella"), i18n("Core team member, expert advice, testing"));\n'
