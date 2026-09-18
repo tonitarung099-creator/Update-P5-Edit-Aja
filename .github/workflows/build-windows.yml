@@ -56,7 +56,7 @@ jobs:
           git -C corresponding-source apply "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
           git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase6.patch"
           python scripts/apply_branding.py corresponding-source --assets branding
-          if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Edit Aja"\)' -Quiet)) {
+          if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Update P5 Edit Aja"\)' -Quiet)) {
             throw 'Update P5 Edit Aja branding verification failed'
           }
           if (-not (Test-Path corresponding-source/src/aiassistant/aiassistantwidget.cpp)) {
