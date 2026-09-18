@@ -79,6 +79,8 @@ The local path performs typo normalization, timeline-context resolution, confide
 
 For the snapshot zoom example, 100% to 111% over 5 seconds means a 4.5-second snapshot ends at 109.9%; clips longer than 5 seconds reach 111% at 5 seconds and then hold. See `LOCAL_EDIT_AGENT.md`.
 
+Phase 12 also adds a native **Local Edit** command bar in the Creator Workspace / AI Assistant. Deterministic commands inspect the live timeline and execute through the same native registry. Smooth snapshot zoom uses the editable `kdenlive_set_transform_keyframes` tool rather than cutting an image into fake animation segments. Complex commands are handed off to the existing API/MCP path without being sent automatically.
+
 
 ## New intelligence engines
 
