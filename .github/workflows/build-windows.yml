@@ -170,25 +170,22 @@ jobs:
 
           p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
           s = p.read_text(encoding="utf-8")
-          needle = """    def configure(self):
-        if not (
-"""
-          replacement = """    def configure(self):
-        # Craft/MinGW: gnulib detects external libxml2 headers and LIBXML2,
-        # but LTLIBXML2 is empty because Craft's CMake-built libxml2 has no
-        # libtool .la metadata. gettext-tools then links libgettextsrc without
-        # -lxml2 and fails with __imp_xml* undefined references.
-        if CraftCore.compiler.isMinGW():
-            libxml_m4 = self.sourceDir() / "gnulib-local" / "m4" / "libxml.m4"
-            m4 = libxml_m4.read_text(encoding="utf-8")
-            old = 'gl_cv_LTLIBXML="$LTLIBXML2 $LTLIBICONV"'
-            new = 'gl_cv_LTLIBXML="$LIBXML2 $LTLIBICONV"'
-            if old in m4:
-                libxml_m4.write_text(m4.replace(old, new), encoding="utf-8")
-            elif new not in m4:
-                raise RuntimeError("Could not locate gettext libxml LTLIBXML assignment")
-        if not (
-"""
+          needle = "    def configure(self):\n        if not (\n"
+          replacement = (
+              "    def configure(self):\n"
+              "        # Craft/MinGW: external libxml2 is detected, but LTLIBXML2 is empty.\n"
+              "        # Reuse LIBXML2 so libgettextsrc links the MinGW import library.\n"
+              "        if CraftCore.compiler.isMinGW():\n"
+              "            libxml_m4 = self.sourceDir() / 'gnulib-local' / 'm4' / 'libxml.m4'\n"
+              "            m4 = libxml_m4.read_text(encoding='utf-8')\n"
+              "            old = 'gl_cv_LTLIBXML=\"$LTLIBXML2 $LTLIBICONV\"'\n"
+              "            new = 'gl_cv_LTLIBXML=\"$LIBXML2 $LTLIBICONV\"'\n"
+              "            if old in m4:\n"
+              "                libxml_m4.write_text(m4.replace(old, new), encoding='utf-8')\n"
+              "            elif new not in m4:\n"
+              "                raise RuntimeError('Could not locate gettext libxml LTLIBXML assignment')\n"
+              "        if not (\n"
+          )
           if needle not in s:
               raise SystemExit("Could not locate gettext configure() hook")
           p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
