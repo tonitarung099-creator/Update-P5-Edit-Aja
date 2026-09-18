@@ -63,7 +63,7 @@ class CreatorPipelineTests(unittest.TestCase):
                     "script":str(writer),
                     "args":["{{workdir}}/one.edit.json"],
                     "outputs":{"plan":"{{workdir}}/one.edit.json"},
-                    "plan_output":"{{one.plan}"
+                    "plan_output":"{{one.plan}}"
                 }],
                 "compose":{"output":"final.edit.json"}
             }
