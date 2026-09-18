@@ -88,7 +88,7 @@ Film Context is an optional **local movie retrieval layer** for AI agents. It do
 
 The base index uses FFmpeg/FFprobe, SQLite, scene timestamps and optional SRT dialogue. Search results are deliberately compact. Neighbor context and JPEG keyframes are fetched only when requested, so an agent can escalate from text metadata to a few candidate images instead of sending the full film.
 
-Stable tool names are: `movie_context_status`, `movie_search`, `movie_get_scene`, `movie_get_context`, and `movie_get_keyframes`. See `FILM_CONTEXT.md`.
+Stable tool names are: `movie_context_status`, `movie_search`, `movie_get_scene`, `movie_get_context`, and `movie_get_keyframes`. The existing AI Assistant gets an optional Film Context section that is disabled by default; when enabled, it can build/select an index and use these tools without changing the ChatGPT/AI Edit JSON path. See `FILM_CONTEXT.md`.
 
 ## New intelligence engines
 
