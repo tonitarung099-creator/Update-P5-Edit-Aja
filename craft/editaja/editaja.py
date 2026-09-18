@@ -98,7 +98,9 @@ class Package(CraftPackageObject.get("kde").pattern):
         # and Windows shortcut as Update P5 Edit Aja. The executable remains kdenlive.exe
         # internally in this first build for maximum compatibility.
         upstream_blueprint = self.blueprintDir().parent / "kdenlive"
-        self.blacklist_file.append(upstream_blueprint / "exclude.list")
+        upstream_exclude = upstream_blueprint / "exclude.list"
+        if upstream_exclude.exists():
+            self.blacklist_file.append(upstream_exclude)
 
         self.addExecutableFilter(r"bin/(?!(ff|kdenlive|kioworker|melt|update-mime-database|snoretoast|drmingw|data/kdenlive)).*")
         self.ignoredPackages.append("libs/llvm")
