@@ -206,7 +206,10 @@ def detect_beats(
     median = statistics.median(positive)
     deviations = [abs(x - median) for x in positive]
     mad = statistics.median(deviations) if deviations else 0.0
-    threshold = median + sensitivity * max(mad, 1e-6)
+    # If all strong onsets have the same novelty, MAD is zero. In that case
+    # the median itself is the correct threshold; adding an epsilon would
+    # incorrectly reject every identical beat.
+    threshold = median + sensitivity * mad
 
     candidates = []
     for i in range(1, len(novelty) - 1):
