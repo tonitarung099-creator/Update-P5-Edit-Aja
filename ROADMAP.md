@@ -13,9 +13,9 @@
 - [x] Automatic project checkpoint before apply.
 - [x] Execution report and stop/continue-on-error modes.
 - [x] Unit tests and CI.
-- [ ] Native **Import AI Edit…** UI inside the editor.
-- [ ] Visual change preview and per-step enable/disable UI.
-- [ ] One-click import of JSON produced by ChatGPT.
+- [x] Native **AI Edit JSON** import UI inside the editor.
+- [ ] Rich visual change preview and per-step enable/disable UI (current preview validates and summarizes the plan).
+- [x] One-click open/validate/apply flow for JSON produced by ChatGPT.
 
 ## Phase 7 — Media intelligence
 
