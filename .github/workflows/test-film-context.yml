@@ -16,7 +16,11 @@ on:
   pull_request:
     paths:
       - "tools/film_context/**"
+      - "patches/phase15-film-context-native.patch.bz2.b64"
+      - "craft/editaja/editaja.py"
+      - ".github/workflows/build-windows.yml"
       - "tests/test_film_context.py"
+      - "tests/test_film_context_native_patch.py"
       - "capabilities/registry.json"
       - "FILM_CONTEXT.md"
       - ".github/workflows/test-film-context.yml"
