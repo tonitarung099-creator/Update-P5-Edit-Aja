@@ -25,7 +25,7 @@ Planned as optional analysis backends feeding the same edit-script/native tool l
 - [x] silence/pause analysis and smart jump-cut JSON generation,
 - [x] motion/activity analysis,
 - [x] filler-word, immediate-repeat and long-gap dialogue analysis,
-- [ ] semantic bad-take detection/review,
+- [x] conservative semantic bad-take detection/review with explicit approval before removal,
 - [x] pacing analysis from detected scene durations,
 - [x] beat analysis and native beat-synced cut planning.
 - [x] beat-synced Smart Montage builder.
@@ -62,8 +62,11 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] quote/source cards and lower thirds,
 - [x] chapter cards,
 - [x] editable Ken Burns/photo motion presets,
-- [ ] reusable advanced documentary motion-graphics templates.
+- [x] reusable staged documentary motion-graphics templates.
 - [x] beat-synced B-roll / AI-image Smart Montage.
+
+- [x] transcript-driven B-roll planning with prompt hints, placeholders and asset resolution.
+- [x] multi-stage Creator Pipeline with artifact passing and final AI Edit composition.
 
 ## Interchange and architecture
 
