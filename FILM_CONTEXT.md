@@ -211,6 +211,7 @@ Phase 15 also adds Film Context directly to the existing AI Assistant without cr
 
 - Film Context is **disabled by default**.
 - The panel can choose an existing local index or build one from a movie plus optional SRT.
+- A separate **Build Visual Index (Optional)…** button runs the OpenCLIP semantic-tag pass only when the user wants it; normal Film Context does not require OpenCLIP/PyTorch.
 - The existing built-in AI Agent receives the five `movie_*` tools only as an extra capability.
 - The agent is instructed to search compact text candidates first, then inspect neighboring scenes, then request keyframes only if needed.
 - `movie_get_keyframes` may attach up to six selected candidate images when the existing vision-frame option is enabled.
