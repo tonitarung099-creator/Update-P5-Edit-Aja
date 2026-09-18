@@ -170,30 +170,29 @@ jobs:
 
           p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
           s = p.read_text(encoding="utf-8")
-          needle = "    def configure(self):\n        if not (\n"
+          needle = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
           replacement = (
-              "    def configure(self):\n"
-              "        # Craft/MinGW: external libxml2 is detected, but LTLIBXML2 is empty.\n"
-              "        # Reuse LIBXML2 so libgettextsrc links the MinGW import library.\n"
-              "        if CraftCore.compiler.isMinGW():\n"
-              "            libxml_m4 = self.sourceDir() / 'gnulib-local' / 'm4' / 'libxml.m4'\n"
-              "            m4 = libxml_m4.read_text(encoding='utf-8')\n"
-              "            old = 'gl_cv_LTLIBXML=\"$LTLIBXML2 $LTLIBICONV\"'\n"
-              "            new = 'gl_cv_LTLIBXML=\"$LIBXML2 $LTLIBICONV\"'\n"
-              "            if old in m4:\n"
-              "                libxml_m4.write_text(m4.replace(old, new), encoding='utf-8')\n"
-              "            elif new not in m4:\n"
-              "                raise RuntimeError('Could not locate gettext libxml LTLIBXML assignment')\n"
-              "        if not (\n"
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMinGW():\n'
+              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
+              '            # libgettextsrc link line can omit the import library.\n'
+              '            # LIBS is propagated by configure to the final libtool link.\n'
+              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
           )
           if needle not in s:
-              raise SystemExit("Could not locate gettext configure() hook")
+              raise SystemExit("Could not locate gettext MinGW configure insertion point")
           p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
           '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
 
           python patch_gettext_libxml2.py
 
-          if (-not (Select-String -Path $gettextBlueprint -Pattern 'gl_cv_LTLIBXML.*LIBXML2' -Quiet)) {
+          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
             throw 'gettext MinGW libxml2 hotfix verification failed'
           }
 
