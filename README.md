@@ -1,44 +1,77 @@
-# Edit Aja
+# Update P5 Edit Aja
 
-**Edit Aja** is an open-source AI-assisted video editor fork built on Kdenlive.
-This repository is intentionally small and reproducible: it pins the exact
-upstream Kdenlive revision, applies the public Phase 5 agent patch, then applies
-Edit Aja branding and packages the result.
+**Update P5 Edit Aja** is the experimental, expanded version of the Edit Aja video editor. It starts from the complete Edit Aja Phase 5 baseline built on Kdenlive/MLT, while the original `Edit-Aja` repository can remain stable.
 
-## What is included
+The project is designed around three editing paths that share the same native timeline foundation:
 
-- Phase 1–5 AI-agent modifications.
-- Built-in OpenAI-compatible API agent.
-- MCP and localhost REST/JSON bridges.
-- Shared native editing tool registry.
-- Edit Aja branding and Windows icon.
-- Reproducible Windows build workflow.
+1. normal manual editing,
+2. the existing Phase 5 built-in AI Agent / MCP / REST control layer, and
+3. deterministic **AI Edit JSON** files created outside the editor (for example by ChatGPT) and applied to the editable timeline.
 
-The internal `kdenlive_*` agent tool names are kept for compatibility. They do
-not mean the user-facing product is still branded as Kdenlive.
+## Current baseline
+
+The repository retains the complete Phase 1–5 Edit Aja work:
+
+- built-in OpenAI-compatible API agent,
+- MCP and localhost REST/JSON bridges,
+- shared native `kdenlive_*` editing tool registry,
+- project/timeline/media/effect/subtitle/render tools,
+- local transcription and silence/jump-cut primitives,
+- Edit Aja branding and Windows packaging workflow.
+
+The internal `kdenlive_*` names intentionally remain for Phase 5 API compatibility.
+
+## Phase 6: AI Edit JSON
+
+The first Update P5 feature is now under `tools/ai_edit/` and `ai-edit/`.
+
+A JSON edit file can call the existing Phase 5 registry directly, reference values returned by earlier steps, resolve a live track, or find the clip covering a timeline time. This means an external AI can make editing decisions while Update P5 Edit Aja remains the deterministic executor.
+
+```text
+MP4 + editing request
+        ↓
+      ChatGPT
+        ↓
+update-p5-ai-edit JSON
+        ↓
+AI Edit runner
+        ↓
+Phase 5 localhost REST bridge
+        ↓
+shared native tool registry
+        ↓
+editable Kdenlive/MLT timeline
+```
+
+Validate an edit file:
+
+```text
+python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/documentary-basic.json
+```
+
+With Update P5 Edit Aja running and the AI Agent panel opened, inspect the live catalog or apply a plan:
+
+```text
+python tools/ai_edit/update_p5_ai_edit.py catalog
+python tools/ai_edit/update_p5_ai_edit.py apply my-edit.json
+```
+
+The runner creates a project checkpoint before applying edits by default. See `ai-edit/FORMAT.md` for the format, references, variables and selectors.
+
+## Roadmap
+
+See `ROADMAP.md`. Planned areas include native AI Edit import UI, scene/media intelligence, advanced captions and audio cleanup, object tracking/masking/background removal, smart reframe, documentary graphics, and additional optional analysis/model backends.
 
 ## Upstream and license
 
-Edit Aja is based on Kdenlive and preserves its GPL licensing and upstream
-copyright notices. The build is pinned to upstream Kdenlive commit:
+Update P5 Edit Aja is based on Edit Aja and Kdenlive and preserves the GPL licensing and upstream copyright notices. The reproducible build remains pinned to upstream Kdenlive commit:
 
 `c3d8a38c04470f6726b21485fc488f2cd2921654`
 
-Upstream: https://github.com/KDE/kdenlive
+Upstream Kdenlive: https://github.com/KDE/kdenlive
 
-The Phase 5 modifications are stored in compressed/base64 form under `patches/`
-so they remain reviewable, portable, and easy to reapply. GitHub Actions decodes
-the patch during the build. A corresponding-source archive is produced alongside
-the Windows installer artifact.
+Original baseline repository: https://github.com/tonitarung099-creator/Edit-Aja
 
-## Repository layout
+This repository: https://github.com/tonitarung099-creator/Update-P5-Edit-Aja
 
-- `patches/phase5.patch.bz2.b64.*` — chunked, compressed Phase 1–5 source changes.
-- `scripts/apply_branding.py` — Edit Aja user-facing branding.
-- `branding/` — Edit Aja Windows icon assets, stored as base64 text.
-- `craft/editaja/editaja.py` — custom KDE Craft package blueprint.
-- `.github/workflows/build-windows.yml` — Windows build/package workflow.
-
-## Build status
-
-Windows builds run through GitHub Actions. Before compiling, the workflow reassembles the Phase 5 chunks and verifies the exact patch SHA-256 (`682be7bcb5afd875eb5f347ecd8f644be5fa1273e175c027ddd1d67491ac9a65`). It then uses KDE Craft and publishes the Windows package plus corresponding source as build artifacts.
+Third-party engines/models added in later phases must receive a separate license/dependency review before they are bundled or distributed.
