@@ -18,9 +18,9 @@ class subinfo(info.infoclass):
         self.svnTargets["editaja"] = f"https://github.com/KDE/kdenlive.git||{UPSTREAM_COMMIT}"
         self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1)]
         self.defaultTarget = "editaja"
-        self.description = "Open-source AI-assisted video editor based on Kdenlive"
-        self.webpage = "https://github.com/tonitarung099-creator/Edit-Aja"
-        self.displayName = "Edit Aja"
+        self.description = "Expanded AI-assisted video editor based on Edit Aja and Kdenlive"
+        self.webpage = "https://github.com/tonitarung099-creator/Update-P5-Edit-Aja"
+        self.displayName = "Update P5 Edit Aja"
 
     def setDependencies(self):
         self.buildDependencies["kde/frameworks/extra-cmake-modules"] = None
@@ -95,7 +95,7 @@ class Package(CraftPackageObject.get("kde").pattern):
 
     def createPackage(self):
         # Reuse Kdenlive's packaging exclusion rules while branding the package
-        # and Windows shortcut as Edit Aja. The executable remains kdenlive.exe
+        # and Windows shortcut as Update P5 Edit Aja. The executable remains kdenlive.exe
         # internally in this first build for maximum compatibility.
         upstream_blueprint = self.blueprintDir().parent / "kdenlive"
         self.blacklist_file.append(upstream_blueprint / "exclude.list")
@@ -109,14 +109,14 @@ class Package(CraftPackageObject.get("kde").pattern):
         self.defines["icon"] = self.sourceDir() / "data/icons/kdenlive.ico"
         self.defines["icon_png"] = self.sourceDir() / "data/icons/256-apps-kdenlive.png"
         self.defines["shortcuts"] = [
-            {"name": "Edit Aja", "target": "bin/kdenlive.exe", "description": self.subinfo.description}
+            {"name": "Update P5 Edit Aja", "target": "bin/kdenlive.exe", "description": self.subinfo.description}
         ]
         self.defines["file_types"] = [".kdenlive"]
 
         if isinstance(self, NullsoftInstallerPackager):
             self.defines["registry_hook"] = (
                 'WriteRegStr SHCTX "Software\\Classes\\.kdenlive" "" "EditAja"\n'
-                'WriteRegStr SHCTX "Software\\Classes\\EditAja" "" "Edit Aja project"\n'
+                'WriteRegStr SHCTX "Software\\Classes\\EditAja" "" "Update P5 Edit Aja project"\n'
                 'WriteRegStr SHCTX "Software\\Classes\\EditAja\\DefaultIcon" "" "$INSTDIR\\kdenlive.ico"\n'
                 'WriteRegStr SHCTX "Software\\Classes\\EditAja\\shell" "" "open"\n'
                 'WriteRegStr SHCTX "Software\\Classes\\EditAja\\shell\\open\\command" "" \'"$INSTDIR\\bin\\kdenlive.exe" "%1"\'\n'
