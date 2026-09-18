@@ -1,0 +1,49 @@
+name: Test Film Context
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/film_context/**"
+      - "tests/test_film_context.py"
+      - "capabilities/registry.json"
+      - "FILM_CONTEXT.md"
+      - ".github/workflows/test-film-context.yml"
+  pull_request:
+    paths:
+      - "tools/film_context/**"
+      - "tests/test_film_context.py"
+      - "capabilities/registry.json"
+      - "FILM_CONTEXT.md"
+      - ".github/workflows/test-film-context.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Film Context unit tests
+        run: python -m unittest tests.test_film_context -v
+      - name: Validate tool catalog
+        run: |
+          python tools/film_context/film_context.py tool-catalog > /tmp/film-context-tools.json
+          python - <<'PY'
+          import json
+          data = json.load(open("/tmp/film-context-tools.json", encoding="utf-8"))
+          names = {tool["name"] for tool in data["tools"]}
+          expected = {
+              "movie_context_status",
+              "movie_search",
+              "movie_get_scene",
+              "movie_get_context",
+              "movie_get_keyframes",
+          }
+          assert names == expected
+          PY
