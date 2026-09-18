@@ -1,6 +1,6 @@
-# Building Edit Aja
+# Building Update P5 Edit Aja
 
-The GitHub Actions workflow is the reference reproducible Windows build.
+The GitHub Actions workflow is the reference reproducible Windows build for Update P5 Edit Aja.
 
 Build chain:
 
@@ -11,6 +11,6 @@ Build chain:
 5. Build/package with the custom `craft/editaja` KDE Craft blueprint.
 6. Upload the installer/package and the exact corresponding-source archive.
 
-The fork deliberately keeps several Kdenlive internal names and file extensions
+Update P5 Edit Aja deliberately keeps several Kdenlive internal names and file extensions
 for compatibility with existing projects, effects, translations, QML modules,
 and the Phase 5 MCP/API namespace.
