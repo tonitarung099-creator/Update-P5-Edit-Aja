@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +17,7 @@ class subinfo(info.infoclass):
         # url|branch|revision: an empty branch plus the full SHA pins the exact
         # upstream source used when Phase 5 was created.
         self.svnTargets["editaja"] = f"https://github.com/KDE/kdenlive.git||{UPSTREAM_COMMIT}"
-        self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1), ("phase12.patch", 1), ("phase13.patch", 1), ("phase14.patch", 1)]
+        self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1), ("phase12.patch", 1), ("phase13.patch", 1), ("phase14.patch", 1), ("phase15.patch", 1)]
         self.defaultTarget = "editaja"
         self.description = "Expanded AI-assisted video editor based on Edit Aja and Kdenlive"
         self.webpage = "https://github.com/tonitarung099-creator/Update-P5-Edit-Aja"
@@ -80,7 +81,14 @@ class Package(CraftPackageObject.get("kde").pattern):
         ]
 
     def configure(self):
-        # Craft has already fetched the pinned source and applied Phase 5, build fixes, Phase 6, Phase 12, Phase 13 and Phase 14 here.
+        # Craft has already fetched the pinned source and applied Phase 5, build fixes, Phase 6, Phase 12, Phase 13, Phase 14 and Phase 15 here.
+        film_context_source = self.blueprintDir() / "film_context.py"
+        if not film_context_source.exists():
+            return False
+        film_context_dir = self.sourceDir() / "data" / "scripts" / "filmcontext"
+        film_context_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(film_context_source, film_context_dir / "film_context.py")
+
         marker = self.sourceDir() / "EDIT_AJA_BRANDING.md"
         if not marker.exists():
             script = self.blueprintDir() / "apply_branding.txt"
