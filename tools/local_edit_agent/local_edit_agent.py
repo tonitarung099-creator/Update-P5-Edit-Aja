@@ -308,7 +308,7 @@ def _parse_zoom(text: str, context: Dict[str, Any]) -> Optional[ParsedCommand]:
             "easing": easing,
             "animations": animations,
         },
-        native_tool_hint="transform-keyframe adapter",
+        native_tool_hint="kdenlive_set_transform_keyframes",
         reason="Deterministic animation math; no LLM required.",
     )
 
