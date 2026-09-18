@@ -162,13 +162,15 @@ LEVEL 4  Short clip only if a future adapter explicitly needs motion
 
 The entire source movie is never required as an API prompt.
 
-## Next native integration
+## Native AI Assistant integration
 
-The core is intentionally merged before the UI bridge. The next integration layer will:
+Phase 15 also adds Film Context directly to the existing AI Assistant without creating a second editor or timeline.
 
-- add an optional Film Context section in the existing AI Assistant,
-- select/build an index without creating a new editor/workspace,
-- register the five Film Context tools with the existing agent registry,
-- keep the plugin disabled by default,
-- keep ChatGPT/AI Edit JSON unchanged,
-- hand final edit decisions to the existing native timeline tools.
+- Film Context is **disabled by default**.
+- The panel can choose an existing local index or build one from a movie plus optional SRT.
+- The existing built-in AI Agent receives the five `movie_*` tools only as an extra capability.
+- The agent is instructed to search compact text candidates first, then inspect neighboring scenes, then request keyframes only if needed.
+- `movie_get_keyframes` may attach up to six selected candidate images when the existing vision-frame option is enabled.
+- The source movie itself is not attached as a whole-film API prompt.
+- ChatGPT/AI Edit JSON is unchanged and remains a separate timeline-command path.
+- Once an AI decides what to edit, normal native timeline tools remain the executor.
