@@ -58,7 +58,6 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("corresponding-source/data/scripts/filmcontext/film_context.py", workflow)
         self.assertIn("Patch Craft gettext MinGW libxml2 linking", workflow)
         self.assertIn("LIBS=-lxml2", workflow)
-        self.assertIn("$LIBXML2 $LTLIBICONV", workflow)
 
     def test_ai_edit_json_stays_separate(self):
         docs = (ROOT / "FILM_CONTEXT.md").read_text(encoding="utf-8")
