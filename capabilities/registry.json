@@ -238,6 +238,17 @@
       "script": "tools/asset_manifest/asset_manifest.py",
       "executables": [],
       "python_modules": []
+    },
+    {
+      "id": "demucs",
+      "name": "Demucs Stem Separation Backend",
+      "category": "audio-backend",
+      "script": "tools/audio_backends/demucs.py",
+      "executables": [],
+      "python_modules": [
+        "demucs"
+      ],
+      "optional": true
     }
   ]
 }
