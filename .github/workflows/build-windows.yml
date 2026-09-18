@@ -27,6 +27,7 @@ jobs:
     env:
       UPSTREAM_COMMIT: c3d8a38c04470f6726b21485fc488f2cd2921654
       PHASE5_SHA256: 682be7bcb5afd875eb5f347ecd8f644be5fa1273e175c027ddd1d67491ac9a65
+      PHASE6_SHA256: 975a7c253f125fc5350aec2f835c2eeed0d7c3b2a3cfe5766810d12244985f37
       CRAFT_ROOT: C:\CraftRoot
 
     steps:
@@ -37,6 +38,7 @@ jobs:
         shell: pwsh
         run: |
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches'); n=['00','01','02','03','04.00','04.01','04.02','05.00','05.01','05.02']; s=''.join((p/f'phase5.patch.bz2.b64.{x}').read_text() for x in n); out=bz2.decompress(base64.b64decode(s)); h=hashlib.sha256(out).hexdigest(); print('Phase 5 SHA-256:',h); assert h=='$env:PHASE5_SHA256'; pathlib.Path('craft/editaja/phase5.patch').write_bytes(out)"
+          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase6-ai-edit-json.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 6 SHA-256:',h); assert h=='$env:PHASE6_SHA256'; pathlib.Path('craft/editaja/phase6.patch').write_bytes(out)"
           Copy-Item patches/build-fixes.patch craft/editaja/build-fixes.patch -Force
           Copy-Item branding/editaja-logo.png.b64 craft/editaja/editaja-logo.png.b64 -Force
           Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.txt -Force
@@ -52,12 +54,16 @@ jobs:
           git -C corresponding-source apply --ignore-space-change -p2 "$env:GITHUB_WORKSPACE\craft\editaja\phase5.patch"
           git -C corresponding-source apply --check "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
           git -C corresponding-source apply "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
+          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase6.patch"
           python scripts/apply_branding.py corresponding-source --assets branding
           if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Edit Aja"\)' -Quiet)) {
             throw 'Edit Aja branding verification failed'
           }
           if (-not (Test-Path corresponding-source/src/aiassistant/aiassistantwidget.cpp)) {
             throw 'Phase 5 AI assistant source is missing'
+          }
+          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'AI Edit JSON' -Quiet)) {
+            throw 'Phase 6 AI Edit JSON UI is missing'
           }
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Remove-Item -Recurse -Force corresponding-source/.git
