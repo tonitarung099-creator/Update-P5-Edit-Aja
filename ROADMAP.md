@@ -39,6 +39,7 @@ Planned as optional analysis backends feeding the same edit-script/native tool l
 - [x] editable animated word/title caption presets (clean/pop/punch/bounce),
 - [x] speaker-aware transcript/caption workflow,
 - [x] optional DeepFilterNet voice cleanup/noise suppression backend,
+- [x] optional Demucs vocal/music/stem separation backend,
 - [x] LUFS/true-peak analysis and native clip-gain normalization plans,
 - [x] native fade-in/fade-out plan generation,
 - [x] native music auto-ducking under speech.
