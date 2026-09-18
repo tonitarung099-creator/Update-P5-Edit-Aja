@@ -1,0 +1,32 @@
+name: Test Workflow Presets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/workflow_presets/**'
+      - 'tests/test_workflow_presets.py'
+      - 'WORKFLOW_PRESETS.md'
+      - '.github/workflows/test-workflow-presets.yml'
+  pull_request:
+    paths:
+      - 'tools/workflow_presets/**'
+      - 'tests/test_workflow_presets.py'
+      - 'WORKFLOW_PRESETS.md'
+      - '.github/workflows/test-workflow-presets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m py_compile tools/workflow_presets/workflow_presets.py
+      - run: python -m unittest tests.test_workflow_presets -v
+      - run: python tools/workflow_presets/workflow_presets.py documentary --transcript transcript.json --rhythm rhythm.json --output /tmp/pipeline.json
