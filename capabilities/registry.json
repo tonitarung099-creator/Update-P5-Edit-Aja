@@ -249,6 +249,14 @@
         "demucs"
       ],
       "optional": true
+    },
+    {
+      "id": "local-edit-agent",
+      "name": "Local Edit Agent",
+      "category": "orchestration",
+      "script": "tools/local_edit_agent/local_edit_agent.py",
+      "executables": [],
+      "python_modules": []
     }
   ]
 }
