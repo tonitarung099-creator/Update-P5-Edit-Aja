@@ -31,6 +31,39 @@ SCENE_TIME_RE = re.compile(r"\bpts_time:(-?\d+(?:\.\d+)?)")
 TOKEN_RE = re.compile(r"[\wÀ-ÿ]+", re.UNICODE)
 SRT_BLOCK_RE = re.compile(r"\r?\n\s*\r?\n")
 
+# Small, recap-oriented visual vocabulary. OpenCLIP compares one representative
+# scene frame against the English labels once during indexing; both English and
+# Indonesian aliases are persisted so normal movie_search stays dependency-light.
+VISUAL_LABELS = [
+    ("a person", "orang"), ("a man", "pria"), ("a woman", "wanita"),
+    ("two people talking", "dua orang berbicara"), ("a group of people", "sekelompok orang"),
+    ("a close up face", "wajah close up"), ("a person crying", "orang menangis"),
+    ("a person smiling", "orang tersenyum"), ("a person angry", "orang marah"),
+    ("a person afraid", "orang ketakutan"), ("a person sleeping", "orang tidur"),
+    ("a person lying down", "orang berbaring"), ("a person walking", "orang berjalan"),
+    ("a person running", "orang berlari"), ("a person entering a room", "orang masuk ruangan"),
+    ("a person leaving", "orang pergi"), ("a person opening a door", "orang membuka pintu"),
+    ("a person looking at something", "orang melihat sesuatu"), ("a person holding an object", "orang memegang benda"),
+    ("a person using a phone", "orang menggunakan telepon"), ("a person reading", "orang membaca"),
+    ("a person driving", "orang mengemudi"), ("a car", "mobil"), ("a motorcycle", "sepeda motor"),
+    ("a road", "jalan"), ("a car crash", "kecelakaan mobil"), ("an explosion", "ledakan"),
+    ("a fire", "api kebakaran"), ("a gun", "pistol senjata"), ("a person shooting", "orang menembak"),
+    ("a fight", "perkelahian"), ("a chase", "pengejaran"), ("a dead body", "mayat"),
+    ("blood or injury", "darah luka"), ("a hospital", "rumah sakit"), ("a police scene", "polisi"),
+    ("a house exterior", "luar rumah"), ("inside a house", "dalam rumah"), ("a bedroom", "kamar tidur"),
+    ("a living room", "ruang tamu"), ("a kitchen", "dapur"), ("an office", "kantor"),
+    ("a school", "sekolah"), ("a restaurant", "restoran"), ("a shop or store", "toko"),
+    ("a street at night", "jalan malam"), ("a city", "kota"), ("a forest", "hutan"),
+    ("a field", "lapangan"), ("a beach or sea", "pantai laut"), ("a mountain", "gunung"),
+    ("a prison", "penjara"), ("a courtroom", "ruang sidang"), ("a funeral", "pemakaman"),
+    ("a wedding", "pernikahan"), ("a party", "pesta"), ("a family scene", "adegan keluarga"),
+    ("a romantic scene", "adegan romantis"), ("a hug", "pelukan"), ("a kiss", "ciuman"),
+    ("food on a table", "makanan di meja"), ("money", "uang"), ("a document or letter", "dokumen surat"),
+    ("a computer screen", "layar komputer"), ("a photograph", "foto"), ("a weapon", "senjata"),
+    ("daylight exterior", "luar siang"), ("night exterior", "luar malam"),
+    ("dark interior", "ruangan gelap"), ("bright interior", "ruangan terang"),
+]
+
 
 class FilmContextError(RuntimeError):
     pass
@@ -242,6 +275,20 @@ def _connect(index_dir: Path) -> sqlite3.Connection:
         raise FilmContextError(f"Film Context index not found: {db}")
     conn = sqlite3.connect(db)
     conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS scene_visual (
+            scene_id INTEGER PRIMARY KEY,
+            model TEXT NOT NULL,
+            pretrained TEXT NOT NULL,
+            frame_time REAL NOT NULL,
+            frame_path TEXT NOT NULL,
+            tags_text TEXT NOT NULL,
+            tags_json TEXT NOT NULL,
+            FOREIGN KEY(scene_id) REFERENCES scenes(scene_id)
+        )
+        """
+    )
     return conn
 
 
@@ -281,6 +328,16 @@ def write_index(
                 text TEXT NOT NULL
             );
             CREATE INDEX subtitles_time ON subtitles(start_seconds, end_seconds);
+            CREATE TABLE scene_visual (
+                scene_id INTEGER PRIMARY KEY,
+                model TEXT NOT NULL,
+                pretrained TEXT NOT NULL,
+                frame_time REAL NOT NULL,
+                frame_path TEXT NOT NULL,
+                tags_text TEXT NOT NULL,
+                tags_json TEXT NOT NULL,
+                FOREIGN KEY(scene_id) REFERENCES scenes(scene_id)
+            );
             """
         )
         meta = {
@@ -368,6 +425,8 @@ def status(index_dir: Path) -> dict[str, Any]:
         scene_count = conn.execute("SELECT COUNT(*) FROM scenes").fetchone()[0]
         subtitle_count = conn.execute("SELECT COUNT(*) FROM subtitles").fetchone()[0]
         note_count = conn.execute("SELECT COUNT(*) FROM scenes WHERE length(trim(notes)) > 0").fetchone()[0]
+        visual_count = conn.execute("SELECT COUNT(*) FROM scene_visual").fetchone()[0]
+        visual_row = conn.execute("SELECT model,pretrained FROM scene_visual LIMIT 1").fetchone()
     finally:
         conn.close()
     return {
@@ -381,12 +440,26 @@ def status(index_dir: Path) -> dict[str, Any]:
         "scene_count": int(scene_count),
         "subtitle_count": int(subtitle_count),
         "annotated_scene_count": int(note_count),
+        "visual_scene_count": int(visual_count),
+        "visual_ready": bool(visual_count),
+        "visual_model": visual_row["model"] if visual_row else None,
+        "visual_pretrained": visual_row["pretrained"] if visual_row else None,
         "api_required": False,
     }
 
 
 def _load_scene_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    return [dict(row) for row in conn.execute("SELECT * FROM scenes ORDER BY scene_id")]
+    return [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT s.*, COALESCE(v.tags_text, '') AS visual_tags
+            FROM scenes s
+            LEFT JOIN scene_visual v ON v.scene_id = s.scene_id
+            ORDER BY s.scene_id
+            """
+        )
+    ]
 
 
 def search_index(
@@ -405,7 +478,7 @@ def search_index(
         rows = _load_scene_rows(conn)
     finally:
         conn.close()
-    docs = [tokenize(f"{row['dialogue']} {row['notes']}") for row in rows]
+    docs = [tokenize(f"{row['dialogue']} {row['notes']} {row.get('visual_tags', '')}") for row in rows]
     doc_freq: Counter[str] = Counter()
     for doc in docs:
         doc_freq.update(set(doc))
@@ -435,6 +508,7 @@ def search_index(
                 "text_score": round(float(semantic), 4),
                 "dialogue": compact_text(row["dialogue"], max_text_chars),
                 "notes": compact_text(row["notes"], max_text_chars),
+                "visual_tags": compact_text(row.get("visual_tags", ""), max_text_chars),
             }
         )
     return {
@@ -451,7 +525,14 @@ def search_index(
 def get_scene(index_dir: Path, scene_id: int, *, max_text_chars: int = 2000) -> dict[str, Any]:
     conn = _connect(index_dir)
     try:
-        row = conn.execute("SELECT * FROM scenes WHERE scene_id=?", (scene_id,)).fetchone()
+        row = conn.execute(
+            """
+            SELECT s.*, COALESCE(v.tags_text, '') AS visual_tags
+            FROM scenes s LEFT JOIN scene_visual v ON v.scene_id=s.scene_id
+            WHERE s.scene_id=?
+            """,
+            (scene_id,),
+        ).fetchone()
         if row is None:
             raise FilmContextError(f"Unknown scene_id: {scene_id}")
         scene = dict(row)
@@ -474,6 +555,7 @@ def get_scene(index_dir: Path, scene_id: int, *, max_text_chars: int = 2000) -> 
             "dialogue": compact_text(scene["dialogue"], max_text_chars),
             "notes": compact_text(scene["notes"], max_text_chars),
             "subtitle_count": int(scene["subtitle_count"]),
+            "visual_tags": compact_text(scene.get("visual_tags", ""), max_text_chars),
         },
         "subtitles": [
             {
@@ -497,7 +579,11 @@ def get_context(index_dir: Path, scene_id: int, *, radius: int = 2, max_text_cha
         rows = [
             dict(item)
             for item in conn.execute(
-                "SELECT * FROM scenes WHERE scene_id BETWEEN ? AND ? ORDER BY scene_id",
+                """
+                SELECT s.*, COALESCE(v.tags_text, '') AS visual_tags
+                FROM scenes s LEFT JOIN scene_visual v ON v.scene_id=s.scene_id
+                WHERE s.scene_id BETWEEN ? AND ? ORDER BY s.scene_id
+                """,
                 (scene_id - radius, scene_id + radius),
             )
         ]
@@ -515,6 +601,7 @@ def get_context(index_dir: Path, scene_id: int, *, radius: int = 2, max_text_cha
                 "end_seconds": round(float(row["end_seconds"]), 6),
                 "dialogue": compact_text(row["dialogue"], max_text_chars),
                 "notes": compact_text(row["notes"], max_text_chars),
+                "visual_tags": compact_text(row.get("visual_tags", ""), max_text_chars),
             }
             for row in rows
         ],
@@ -597,6 +684,188 @@ def get_keyframes(
     }
 
 
+
+def _load_openclip_backend(model_name: str, pretrained: str, device: str):
+    try:
+        import open_clip  # type: ignore
+        import torch  # type: ignore
+        from PIL import Image  # type: ignore
+    except ImportError as exc:
+        raise FilmContextError(
+            "Visual semantic indexing is optional. Install open_clip_torch, torch and Pillow first."
+        ) from exc
+
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    try:
+        model, _, preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained)
+        tokenizer = open_clip.get_tokenizer(model_name)
+    except Exception as exc:
+        raise FilmContextError(f"Could not load OpenCLIP model {model_name}/{pretrained}: {exc}") from exc
+    model = model.to(device)
+    model.eval()
+    return open_clip, torch, Image, model, preprocess, tokenizer, device
+
+
+def _extract_visual_midframe(media: Path, target: Path, at: float, ffmpeg: str, width: int) -> None:
+    if target.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    proc = _run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{at:.6f}",
+            "-i",
+            str(media),
+            "-frames:v",
+            "1",
+            "-vf",
+            f"scale='min({width},iw)':-2",
+            "-q:v",
+            "3",
+            "-y",
+            str(target),
+        ]
+    )
+    if proc.returncode != 0:
+        raise FilmContextError(proc.stderr.strip() or f"Could not extract visual frame at {at:.3f}s")
+
+
+def build_visual_semantic_tags(
+    index_dir: Path,
+    *,
+    ffmpeg: str,
+    model_name: str = "ViT-B-32",
+    pretrained: str = "laion2b_s34b_b79k",
+    device: str = "auto",
+    batch_size: int = 8,
+    tags_per_scene: int = 8,
+    width: int = 512,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Build optional local semantic visual tags once, then keep normal search light.
+
+    The OpenCLIP model is needed only for this indexing command. movie_search
+    later reads persisted bilingual tags from SQLite and does not import torch.
+    """
+    info = status(index_dir)
+    media = Path(str(info["media_path"]))
+    if not media.exists():
+        raise FilmContextError(f"Indexed media is not available: {media}")
+
+    _, torch, Image, model, preprocess, tokenizer, resolved_device = _load_openclip_backend(
+        model_name, pretrained, device
+    )
+    prompts = [f"a movie scene showing {english}" for english, _ in VISUAL_LABELS]
+    with torch.no_grad():
+        text_tokens = tokenizer(prompts).to(resolved_device)
+        text_features = model.encode_text(text_tokens)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
+    conn = _connect(index_dir)
+    try:
+        rows = _load_scene_rows(conn)
+        if force:
+            conn.execute("DELETE FROM scene_visual")
+            conn.commit()
+        existing = {
+            int(row["scene_id"])
+            for row in conn.execute(
+                "SELECT scene_id FROM scene_visual WHERE model=? AND pretrained=?",
+                (model_name, pretrained),
+            )
+        }
+
+        pending: list[tuple[dict[str, Any], Path, float]] = []
+        cache_dir = index_dir / "visual-keyframes"
+        for row in rows:
+            scene_id = int(row["scene_id"])
+            if scene_id in existing and not force:
+                continue
+            at = _safe_keyframe_time(float(row["start_seconds"]), float(row["end_seconds"]), 0, 1)
+            frame_path = cache_dir / f"scene-{scene_id:05d}.jpg"
+            _extract_visual_midframe(media, frame_path, at, ffmpeg, width)
+            pending.append((row, frame_path, at))
+
+        batch_size = max(1, min(int(batch_size), 64))
+        tags_per_scene = max(1, min(int(tags_per_scene), 20))
+        indexed = 0
+        for offset in range(0, len(pending), batch_size):
+            batch = pending[offset : offset + batch_size]
+            tensors = []
+            for _, frame_path, _ in batch:
+                with Image.open(frame_path) as image:
+                    tensors.append(preprocess(image.convert("RGB")))
+            if not tensors:
+                continue
+            images = torch.stack(tensors).to(resolved_device)
+            with torch.no_grad():
+                image_features = model.encode_image(images)
+                image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+                similarities = image_features @ text_features.T
+
+            for item_index, (row, frame_path, at) in enumerate(batch):
+                values, indices = similarities[item_index].topk(min(tags_per_scene, len(VISUAL_LABELS)))
+                tags = []
+                tags_text_parts = []
+                for score, label_index in zip(values.detach().cpu().tolist(), indices.detach().cpu().tolist()):
+                    english, indonesian = VISUAL_LABELS[int(label_index)]
+                    tags.append(
+                        {
+                            "en": english,
+                            "id": indonesian,
+                            "score": round(float(score), 4),
+                        }
+                    )
+                    tags_text_parts.extend([english, indonesian])
+                tags_text = " ; ".join(tags_text_parts)
+                conn.execute(
+                    """
+                    INSERT INTO scene_visual(scene_id,model,pretrained,frame_time,frame_path,tags_text,tags_json)
+                    VALUES (?,?,?,?,?,?,?)
+                    ON CONFLICT(scene_id) DO UPDATE SET
+                        model=excluded.model,
+                        pretrained=excluded.pretrained,
+                        frame_time=excluded.frame_time,
+                        frame_path=excluded.frame_path,
+                        tags_text=excluded.tags_text,
+                        tags_json=excluded.tags_json
+                    """,
+                    (
+                        int(row["scene_id"]),
+                        model_name,
+                        pretrained,
+                        float(at),
+                        str(frame_path.resolve()),
+                        tags_text,
+                        json.dumps(tags, ensure_ascii=False),
+                    ),
+                )
+                indexed += 1
+            conn.commit()
+    finally:
+        conn.close()
+
+    final = status(index_dir)
+    return {
+        "ok": True,
+        "backend": "openclip-semantic-tags",
+        "model": model_name,
+        "pretrained": pretrained,
+        "device": resolved_device,
+        "indexed_now": indexed,
+        "visual_scene_count": final["visual_scene_count"],
+        "scene_count": final["scene_count"],
+        "tags_per_scene": tags_per_scene,
+        "search_after_index": "lightweight-bm25-over-dialogue-notes-bilingual-visual-tags",
+        "api_used": False,
+    }
+
+
 def tool_catalog() -> dict[str, Any]:
     return {
         "format": "update-p5-film-context-tools",
@@ -610,7 +879,7 @@ def tool_catalog() -> dict[str, Any]:
             },
             {
                 "name": "movie_search",
-                "description": "Search local scene dialogue/notes and return a small ranked candidate list.",
+                "description": "Search local scene dialogue/notes plus optional persisted visual semantic tags and return a small ranked candidate list.",
                 "required": ["query"],
             },
             {
@@ -706,6 +975,16 @@ def build_parser() -> argparse.ArgumentParser:
     cmd.add_argument("notes")
     cmd.add_argument("--index-dir", type=Path, required=True)
 
+    cmd = sub.add_parser("visual-index", help="Optionally build local OpenCLIP semantic visual tags once")
+    cmd.add_argument("--index-dir", type=Path, required=True)
+    cmd.add_argument("--model", default="ViT-B-32")
+    cmd.add_argument("--pretrained", default="laion2b_s34b_b79k")
+    cmd.add_argument("--device", default="auto")
+    cmd.add_argument("--batch-size", type=int, default=8)
+    cmd.add_argument("--tags-per-scene", type=int, default=8)
+    cmd.add_argument("--width", type=int, default=512)
+    cmd.add_argument("--force", action="store_true")
+
     cmd = sub.add_parser("keyframes", help="Generate a few candidate keyframes on demand")
     cmd.add_argument("scene_ids", nargs="+", type=int)
     cmd.add_argument("--index-dir", type=Path, required=True)
@@ -750,6 +1029,18 @@ def main(argv: list[str] | None = None) -> int:
             result = get_context(args.index_dir, args.scene_id, radius=args.radius)
         elif args.command == "annotate":
             result = annotate_scene(args.index_dir, args.scene_id, args.notes)
+        elif args.command == "visual-index":
+            result = build_visual_semantic_tags(
+                args.index_dir,
+                ffmpeg=_binary("ffmpeg", args.ffmpeg),
+                model_name=args.model,
+                pretrained=args.pretrained,
+                device=args.device,
+                batch_size=args.batch_size,
+                tags_per_scene=args.tags_per_scene,
+                width=args.width,
+                force=args.force,
+            )
         elif args.command == "keyframes":
             result = get_keyframes(
                 args.index_dir,
