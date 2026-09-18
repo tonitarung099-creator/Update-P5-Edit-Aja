@@ -117,7 +117,8 @@ GPU-heavy models should remain optional modules rather than mandatory editor dep
 - [x] On-demand keyframe extraction only for requested candidate scenes.
 - [x] Stable JSON tool protocol for Gemini/API adapters.
 - [x] Scene annotation field so later local semantic/vision backends can enrich the same index without changing the protocol.
-- [ ] Native AI Assistant panel for selecting/building a Film Context index.
-- [ ] Direct built-in AI Agent bridge to the Film Context tool protocol.
+- [x] Native AI Assistant panel for selecting/building a Film Context index.
+- [x] Direct built-in AI Agent bridge to the Film Context tool protocol.
 - [ ] Optional local multilingual semantic/visual embeddings after dependency/license review.
-- [ ] Vision-frame escalation policy: text first, then a few keyframes, then short clips only when needed.
+- [x] Text-first vision escalation to a few requested keyframes, capped at six images per tool call when vision attachment is enabled.
+- [ ] Short-clip motion escalation only when still frames are insufficient.
