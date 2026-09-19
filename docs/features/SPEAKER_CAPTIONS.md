@@ -13,7 +13,7 @@ It understands:
 
 ```text
 python tools/speaker_captions/speaker_captions.py transcript.json \
-  --styles caption/examples/speaker-styles.json \
+  --styles examples/caption/speaker-styles.json \
   --output interview-captions.edit.json
 ```
 
