@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import zipfile
@@ -54,18 +55,19 @@ def write_source_archive(source_root: Path, archive_path: Path) -> None:
     archive_path.parent.mkdir(parents=True, exist_ok=True)
     archive_path.unlink(missing_ok=True)
 
-    git_dir = source_root / ".git"
-    if git_dir.exists():
-        shutil.rmtree(git_dir)
-
     with zipfile.ZipFile(
         archive_path,
         mode="w",
         compression=zipfile.ZIP_DEFLATED,
         compresslevel=9,
     ) as archive:
-        for path in sorted(source_root.rglob("*")):
-            if path.is_file():
+        for current_root, directories, filenames in os.walk(source_root):
+            directories[:] = sorted(
+                name for name in directories if name != ".git"
+            )
+            current = Path(current_root)
+            for filename in sorted(filenames):
+                path = current / filename
                 archive.write(path, path.relative_to(source_root))
 
     print(f"Verified corresponding source archive: {archive_path}")
