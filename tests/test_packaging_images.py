@@ -1,8 +1,13 @@
+import os
+import sys
 import tempfile
+from enum import IntFlag
+from types import ModuleType, SimpleNamespace
+from unittest.mock import patch
 import unittest
 from pathlib import Path
 
-from scripts.prepare_package_images import compatible_image_candidates
+from scripts.prepare_package_images import compatible_image_candidates, create_windows_junction, prepare
 
 
 class PackagingImageTests(unittest.TestCase):
@@ -28,6 +33,128 @@ class PackagingImageTests(unittest.TestCase):
                 compatible_image_candidates(root, "image-RelWithDebInfo-14.2.0"),
                 [],
             )
+
+
+    def test_rejects_debug_unknown_and_suffix_matched_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("image-Debug-14.2.0", "image-Custom-14.2.0", "image-MinSizeRel-custom-14.2.0"):
+                (root / name).mkdir()
+            self.assertEqual(compatible_image_candidates(root, "image-RelWithDebInfo-14.2.0"), [])
+            (root / "image-MinSizeRel-14.2.0").mkdir()
+            self.assertEqual(compatible_image_candidates(root, "image-Debug-14.2.0"), [])
+
+    @unittest.skipUnless(os.name == "nt", "Windows junction integration")
+    def test_windows_junction_exposes_runtime_and_preserves_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "image-MinSizeRel-14.2.0"
+            destination = root / "image-RelWithDebInfo-14.2.0"
+            source.mkdir()
+            (source / "runtime.dll").write_bytes(b"runtime fixture")
+            try:
+                create_windows_junction(source, destination)
+                self.assertEqual((destination / "runtime.dll").read_bytes(), b"runtime fixture")
+                self.assertTrue(destination.samefile(source))
+                with self.assertRaises(RuntimeError):
+                    create_windows_junction(source, destination)
+            finally:
+                if destination.is_dir():
+                    os.rmdir(destination)
+            self.assertEqual((source / "runtime.dll").read_bytes(), b"runtime fixture")
+
+
+class PackagingPreflightTests(unittest.TestCase):
+    """Exercise the helper's dependency contract; Windows CI covers mklink itself."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root / "craft/bin").mkdir(parents=True)
+        self.dependencies = []
+        self.ignored = ["libs/llvm"]
+        self.owner = SimpleNamespace(ignoredPackages=self.ignored)
+
+        class DependencyType(IntFlag):
+            Runtime = 1
+            Packaging = 8
+
+        class SourceOnly:
+            pass
+
+        self.source_only = SourceOnly
+        self.dep_type = DependencyType
+        package_module = ModuleType("Blueprints.CraftPackageObject")
+        package_module.CraftPackageObject = SimpleNamespace(get=lambda name: SimpleNamespace(instance=self.owner))
+        dependency_module = ModuleType("Blueprints.CraftDependencyPackage")
+        dependency_module.DependencyType = DependencyType
+        dependency_module.CraftDependencyPackage = lambda package: SimpleNamespace(getDependencies=self.resolve)
+        source_module = ModuleType("Package.SourceOnlyPackageBase")
+        source_module.SourceOnlyPackageBase = SourceOnly
+        modules = {
+            "Blueprints.CraftPackageObject": package_module,
+            "Blueprints.CraftDependencyPackage": dependency_module,
+            "Package.SourceOnlyPackageBase": source_module,
+        }
+        self.modules = patch.dict(sys.modules, modules)
+        self.modules.start()
+        self.addCleanup(self.modules.stop)
+        self.path_patch = patch.object(sys, "path", list(sys.path))
+        self.path_patch.start()
+        self.addCleanup(self.path_patch.stop)
+
+    def resolve(self, *, depType, ignoredPackages):
+        self.assertEqual(depType, self.dep_type.Runtime | self.dep_type.Packaging)
+        self.assertIs(ignoredPackages, self.ignored)
+        return self.dependencies
+
+    def dependency(self, name, desired_exists=False, alternative="MinSizeRel"):
+        root = self.root / name
+        root.mkdir(parents=True)
+        desired = root / "image-RelWithDebInfo-14.2.0"
+        if desired_exists:
+            desired.mkdir()
+        if alternative:
+            (root / f"image-{alternative}-14.2.0").mkdir()
+        self.dependencies.append(SimpleNamespace(path=name, instance=SimpleNamespace(imageDir=lambda: desired)))
+        return desired
+
+    def test_runtime_fallback_is_used_and_existing_images_untouched(self):
+        desired = self.dependency("libs/runtime")
+        self.dependency("application", desired_exists=True)
+        self.dependencies.append(SimpleNamespace(path="source-only", instance=self.source_only()))
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            self.assertEqual(prepare(self.root, "application"), 0)
+            junction.assert_called_once_with(desired.parent / "image-MinSizeRel-14.2.0", desired)
+
+    def test_missing_application_prevents_all_mutations(self):
+        self.dependency("libs/runtime")
+        desired = self.dependency("application")
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            with self.assertRaisesRegex(RuntimeError, "application"):
+                prepare(self.root, "application")
+            junction.assert_not_called()
+        self.assertFalse(desired.exists())
+
+    def test_existing_runtime_is_idempotent(self):
+        self.dependency("libs/runtime", desired_exists=True)
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            self.assertEqual(prepare(self.root, "application"), 0)
+            junction.assert_not_called()
+
+    def test_debug_runtime_is_not_a_release_fallback(self):
+        self.dependency("libs/runtime", alternative="Debug")
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            with self.assertRaisesRegex(RuntimeError, "libs/runtime"):
+                prepare(self.root, "application")
+            junction.assert_not_called()
+
+    def test_junction_failure_is_not_reported_as_success(self):
+        self.dependency("libs/runtime")
+        with patch("scripts.prepare_package_images.create_windows_junction", side_effect=RuntimeError("mklink failed")):
+            with self.assertRaisesRegex(RuntimeError, "mklink failed"):
+                prepare(self.root, "application")
 
 
 if __name__ == "__main__":

@@ -17,17 +17,19 @@ def compatible_image_candidates(build_root: Path, desired_name: str) -> list[Pat
     parts = desired_name.split("-", 2)
     if len(parts) != 3:
         return []
-    _, _build_type, target = parts
-    candidates = []
-    for path in build_root.glob(f"image-*-{target}"):
-        if path.name == desired_name or path.name.endswith("-dbg") or not path.is_dir():
-            continue
-        candidates.append(path)
-    preference = {"MinSizeRel": 0, "Release": 1, "RelWithDebInfo": 2, "Debug": 3}
-    return sorted(
-        candidates,
-        key=lambda p: (preference.get(p.name.split("-", 2)[1], 99), p.name),
-    )
+    _, build_type, target = parts
+    release_types = ("MinSizeRel", "Release", "RelWithDebInfo")
+    if build_type not in release_types or not target or target.endswith("-dbg"):
+        return []
+    # Exact names: never substitute another version, a Debug build, or a
+    # similarly suffixed target (for example custom-14.2.0 for 14.2.0).
+    return [
+        path
+        for candidate_type in release_types
+        if candidate_type != build_type
+        for path in [build_root / f"image-{candidate_type}-{target}"]
+        if path.is_dir()
+    ]
 
 
 def create_windows_junction(source: Path, destination: Path) -> None:
@@ -65,7 +67,7 @@ def prepare(craft_root: Path, package_name: str) -> int:
         ignoredPackages=owner.ignoredPackages,
     )
 
-    repaired = 0
+    repairs = []
     missing = []
     for dependency in dependencies:
         instance = dependency.instance
@@ -76,15 +78,20 @@ def prepare(craft_root: Path, package_name: str) -> int:
         if desired.is_dir():
             continue
 
-        candidates = compatible_image_candidates(Path(instance.buildRoot()), desired.name)
+        # Build #51 installed these unchanged MinGW runtime DLLs during
+        # bootstrap as MinSizeRel. Do not generalize this exception to Qt,
+        # other dependencies, or the application we must actually compile.
+        candidates = (
+            compatible_image_candidates(desired.parent, desired.name)
+            if dependency.path == "libs/runtime"
+            else []
+        )
         if not candidates:
             missing.append((str(dependency), str(desired)))
             continue
 
         source = candidates[0]
-        print(f"Packaging image compatibility: {dependency}: {desired.name} -> {source.name}")
-        create_windows_junction(source, desired)
-        repaired += 1
+        repairs.append((dependency, source, desired))
 
     if missing:
         details = "\n".join(f"- {name}: {path}" for name, path in missing)
@@ -93,7 +100,12 @@ def prepare(craft_root: Path, package_name: str) -> int:
             f"image exists:\n{details}"
         )
 
-    print(f"Packaging image preparation complete; repaired {repaired} image path(s).")
+    # Validate the complete package before creating any junctions.
+    for dependency, source, desired in repairs:
+        print(f"Packaging image compatibility: {dependency}: {desired.name} -> {source.name}")
+        create_windows_junction(source, desired)
+
+    print(f"Packaging image preparation complete; repaired {len(repairs)} image path(s).")
     return 0
 
 

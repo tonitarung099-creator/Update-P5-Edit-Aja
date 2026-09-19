@@ -243,6 +243,18 @@ jobs:
           }
           Write-Host "Validated $($scripts.Count) PowerShell scripts."
 
+  packaging-preflight:
+    name: Build / Windows Packaging Preflight
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test packaging preflight and real Windows junctions
+        run: python -m unittest tests.test_packaging_images -v
+
   source-reconstruction:
     name: Source / Reconstruction
     needs: build-configuration
