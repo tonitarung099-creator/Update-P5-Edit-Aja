@@ -42,3 +42,18 @@ Regression tests exercise the dependency traversal and failure paths. The
 Windows quality gate also creates a real junction and checks file access,
 existing-destination failure, and preservation of the source after removal.
 This gate does not replace testing the final installer and application.
+
+## Craft configuration discovery
+
+Build #56 compiled successfully but the external packaging helper searched for
+`D:\etc\CraftSettings.ini` instead of the configured installation. The pinned
+CraftConfig implementation uses `craftRoot` (the Craft checkout directory) or
+the invoked script's location to discover its settings. Neither `CRAFT_ROOT`
+nor `KDEROOT` controls that lookup.
+
+The helper validates the installation and sets `craftRoot` before importing
+Craft modules. The Windows preflight quality gate now runs the real CLI against
+the manifest-pinned Craft checkout, with an isolated configuration and a small
+source-only blueprint. It checks external-script invocation, paths with spaces,
+a stale locator, and missing settings without downloading the application
+dependencies. This tests real Craft initialization, not a mocked configuration.
