@@ -11,6 +11,8 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"AI Edit JSON", "Phase 6 AI Edit JSON UI"),
     ("src/aiassistant/aiassistantwidget.cpp", r"Local Edit.*Lightweight", "Phase 12 Local Edit UI"),
     ("src/mainwindow.cpp", r"kdenlive_set_transform_keyframes", "Phase 12 native Transform keyframe tool"),
+    ("src/mainwindow.cpp", r"keyframes->removeAllKeyframes\(\)", "Keyframe API compatibility fix"),
+    ("src/mainwindow.cpp", r"keyframes->updateKeyframe\(", "Public keyframe value update path"),
     ("src/mainwindow.cpp", r"kdenlive_get_scene_map", "Phase 13 Scene Detection map tool"),
     ("src/aiassistant/aiassistantwidget.cpp", r"beginMacro.*Local Edit: Zoom snapshots", "Phase 13 Local Edit single-undo grouping"),
     ("src/aiassistant/aiassistantwidget.cpp", r"Local Edit History", "Phase 14 Local Edit History UI"),
