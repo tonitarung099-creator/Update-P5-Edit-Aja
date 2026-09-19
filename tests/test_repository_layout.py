@@ -13,7 +13,6 @@ ALLOWED_ROOT_MARKDOWN = {
 
 ALLOWED_WORKFLOW_YAML = {
     "build-windows.yml",
-    "cancel-stale-builds.yml",
     "test-suite.yml",
     "validate-build.yml",
 }
