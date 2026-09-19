@@ -26,7 +26,7 @@ Use double-brace tokens:
 
 ```text
 python tools/creator_pipeline/creator_pipeline.py \
-  creator/examples/documentary-pipeline.json \
+  examples/creator/documentary-pipeline.json \
   --workdir ./creator-output \
   --report ./creator-output/pipeline-report.json
 ```
