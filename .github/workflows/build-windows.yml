@@ -11,8 +11,6 @@ on:
       - 'scripts/**'
       - 'craft/**'
       - 'tools/film_context/**'
-      - 'README.md'
-      - 'BUILDING.md'
   workflow_dispatch:
 
 permissions:
