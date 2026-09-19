@@ -8,18 +8,17 @@ expensive check, not the first debugging tool.
 1. **Static / Repository** — Python syntax, JSON examples, repository layout.
 2. **Component tests** — independent feature domains run in parallel.
 3. **Contracts / Examples** — CLI contracts and representative example flows.
-4. **Build validation** — pinned revisions, checksums, workflow YAML, Python
-   build helpers, and PowerShell syntax.
-5. **Source reconstruction** — reconstruct the pinned Kdenlive source and apply
-   the P5 patch chain in the manifest order.
-6. **Windows compile** — compile the verified source with pinned Craft inputs.
+4. **Build / Configuration** — pinned revisions, checksums, workflow YAML,
+   Python build helpers, and PowerShell syntax.
+5. **Source / Reconstruction** — reconstruct the pinned Kdenlive source on
+   Linux and apply/verify the complete P5 patch chain.
+6. **Windows compile** — only a successful `main` quality-gate run can trigger
+   the Windows build, which checks out that exact verified commit.
 7. **Packaging** — create and collect the Windows artifact.
 8. **Release smoke test** — verify the packaged application starts and key
    product flows work.
 
 ## Component boundaries
-
-The main test workflow reports independent domains:
 
 | Gate | Typical ownership |
 | --- | --- |
@@ -29,9 +28,11 @@ The main test workflow reports independent domains:
 | Captions | caption generation, animation and speaker handling |
 | Visual Segmentation | visual intelligence, SAM adapter and mask effects |
 | Documentary | documentary toolkit, graphics and motion templates |
+| Build / Configuration | manifest, pinned revisions, workflow syntax, build helpers |
+| Source / Reconstruction | upstream source, patch order/application, branding, required source markers |
 
 A green domain should remain untouched while repairing an unrelated red domain
-unless the failure evidence shows a dependency.
+unless failure evidence shows a dependency.
 
 ## Debugging rule
 
