@@ -62,6 +62,15 @@ class BuildManifestTests(unittest.TestCase):
         actual = {path.name for path in (ROOT / "scripts" / "windows").glob("*.ps1")}
         self.assertTrue(required.issubset(actual))
 
+    def test_cross_platform_source_reconstruction_is_canonical(self):
+        shared = ROOT / "scripts" / "reconstruct_source.py"
+        wrapper = ROOT / "scripts" / "windows" / "reconstruct-source.ps1"
+        self.assertTrue(shared.is_file())
+        self.assertIn(
+            "python scripts/reconstruct_source.py",
+            wrapper.read_text(encoding="utf-8"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
