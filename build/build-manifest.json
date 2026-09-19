@@ -110,6 +110,13 @@
       "path": "craft/editaja/phase15.patch",
       "strip": 1,
       "ignore_space_change": true
+    },
+    {
+      "name": "keyframe-api-compile-fix",
+      "path": "patches/keyframe-api-compile-fix.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -120,6 +127,10 @@
     {
       "source": "patches/build-fixes.patch",
       "destination": "craft/editaja/build-fixes.patch"
+    },
+    {
+      "source": "patches/keyframe-api-compile-fix.patch",
+      "destination": "craft/editaja/keyframe-api-compile-fix.patch"
     },
     {
       "source": "branding/editaja-logo.png.b64",
