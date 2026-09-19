@@ -1,0 +1,60 @@
+name: Validate Build Configuration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/configure_craft.py'
+      - 'tests/test_build_configuration.py'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/configure_craft.py'
+      - 'tests/test_build_configuration.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test Craft configuration updates
+        run: python -m unittest discover -s tests -p test_build_configuration.py -v
+      - name: Install YAML parser
+        run: python -m pip install PyYAML==6.0.3
+      - name: Parse workflow YAML and extract PowerShell scripts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import yaml
+
+          scripts = []
+          for path in sorted(Path('.github/workflows').glob('*.yml')):
+              workflow = yaml.safe_load(path.read_text())
+              for job in workflow.get('jobs', {}).values():
+                  for step in job.get('steps', []):
+                      if step.get('shell') == 'pwsh' and 'run' in step:
+                          scripts.append({'name': f'{path}: {step["name"]}', 'script': step['run']})
+          Path('workflow-scripts.json').write_text(json.dumps(scripts))
+          PY
+      - name: Parse PowerShell syntax without executing build commands
+        shell: pwsh
+        run: |
+          $scripts = Get-Content workflow-scripts.json -Raw | ConvertFrom-Json
+          foreach ($entry in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseInput($entry.script, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              throw "$($entry.name): $($errors | Out-String)"
+            }
+          }
+          Write-Host "Validated $($scripts.Count) PowerShell scripts."

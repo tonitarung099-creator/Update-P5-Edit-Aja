@@ -34,6 +34,7 @@ jobs:
       PHASE14_SHA256: 864aa6d7aeee21a965df407c1be2b9da7dde744cc065eccb698d7e5fdca7c248
       PHASE15_SHA256: a8dc28c9e679d65d0551f997515ee0603983e373d1ab545def8d7fd5593e217a
       CRAFT_ROOT: C:\CraftRoot
+      CRAFT_BUILD_TYPE: RelWithDebInfo
 
     steps:
       - name: Checkout Update P5 Edit Aja build repository
@@ -42,6 +43,7 @@ jobs:
       - name: Reassemble and verify source patches
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches'); n=['00','01','02','03','04.00','04.01','04.02','05.00','05.01','05.02']; s=''.join((p/f'phase5.patch.bz2.b64.{x}').read_text() for x in n); out=bz2.decompress(base64.b64decode(s)); h=hashlib.sha256(out).hexdigest(); print('Phase 5 SHA-256:',h); assert h=='$env:PHASE5_SHA256'; pathlib.Path('craft/editaja/phase5.patch').write_bytes(out)"
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase6-ai-edit-json.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 6 SHA-256:',h); assert h=='$env:PHASE6_SHA256'; pathlib.Path('craft/editaja/phase6.patch').write_bytes(out)"
           python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase12-local-edit-native.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 12 SHA-256:',h); assert h=='$env:PHASE12_SHA256'; pathlib.Path('craft/editaja/phase12.patch').write_bytes(out)"
@@ -54,8 +56,10 @@ jobs:
           Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.txt -Force
 
       - name: Reconstruct and verify corresponding source
+        id: corresponding_source
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           New-Item -ItemType Directory -Force corresponding-source | Out-Null
           git -C corresponding-source init
           git -C corresponding-source remote add origin https://github.com/KDE/kdenlive.git
@@ -121,6 +125,7 @@ jobs:
       - name: Bootstrap KDE Craft with MinGW x64
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           $env:PATH = (($env:PATH -split ';') | Where-Object {
             $_ -and
             $_ -notmatch '(?i)\\Git\\bin$' -and
@@ -151,16 +156,13 @@ jobs:
           if (-not (Test-Path $cfg)) {
             throw "Craft settings not found: $cfg"
           }
-          $text = Get-Content $cfg -Raw
-          $text = [regex]::Replace($text, '(?m)^ABI\s*=.*$', 'ABI = windows-gcc-x86_64')
-          $text = [regex]::Replace($text, '(?m)^MakeProgram\s*=.*$', 'MakeProgram = mingw32-make')
-          # Craft source builds on Windows require a short-path drive mapping.
-          # Configure it explicitly before any dependency source is unpacked.
-          if ($text -match '(?m)^\[ShortPath\]\s*
+          python scripts/configure_craft.py $cfg
+          Get-Content $cfg | Select-String 'ABI|BuildType|UseNinja|MakeProgram|ShortPath|DriveLetter|UseCache'
 
       - name: Patch Craft gettext MinGW libxml2 linking
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
           if (-not (Test-Path $gettextBlueprint)) {
             throw "Craft gettext blueprint not found: $gettextBlueprint"
@@ -200,6 +202,7 @@ jobs:
       - name: Install Update P5 Edit Aja Craft blueprint
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
             Select-Object -First 1
           if (-not $blueprintRoot) {
@@ -211,512 +214,127 @@ jobs:
           Write-Host "Update P5 Edit Aja blueprint: $target"
           Get-ChildItem $target
 
+      - name: Install dependencies from KDE binary cache
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
+          foreach ($property in $setup.PSObject.Properties) {
+            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
+          }
+          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
+          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --use-cache --install-deps kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build Update P5 Edit Aja
         shell: pwsh
         run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference = $true
+          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
+          foreach ($property in $setup.PSObject.Properties) {
+            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
           }
+          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
+
+          # Dependencies were installed above from KDE's binary cache.
+          # --no-cache here intentionally builds our modified Edit Aja source.
+          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --no-cache kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install Windows packager
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
+          foreach ($property in $setup.PSObject.Properties) {
+            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
+          }
+          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
+          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --use-cache --update nsis
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package Update P5 Edit Aja
         shell: pwsh
         run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference = $true
+          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
+          foreach ($property in $setup.PSObject.Properties) {
+            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
           }
+          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
+          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --package kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Collect Windows package
-        if: always()
+        id: windows_package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
+          # Run only after a successful build and package step. Keep source
+          # archives out of the directory published as the Windows application.
+          New-Item -ItemType Directory -Force artifacts/windows | Out-Null
+          $binaryCount = 0
+
+          if (Test-Path "$env:CRAFT_ROOT\craft\bin\craft.py") {
+            $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            foreach ($property in $setup.PSObject.Properties) {
+              Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
+            }
+            $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
+            $packageDirOutput = & python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE -q --get "packageDestinationDir()" virtual/base 2>$null
+            # An empty query result must still allow the fallback search below.
+            $packageDir = "$($packageDirOutput | Select-Object -Last 1)".Trim()
+
+            if ($packageDir -and (Test-Path $packageDir)) {
+              Write-Host "Craft package directory: $packageDir"
+              $packages = Get-ChildItem $packageDir -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object {
+                  $_.Extension -in '.exe','.zip','.7z','.sha256' -and
+                  ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
+                }
+              foreach ($p in $packages) {
+                Copy-Item $p.FullName (Join-Path 'artifacts/windows' $p.Name) -Force
+                if ($p.Extension -in '.exe','.zip','.7z') { $binaryCount++ }
+              }
+            }
+          }
+
+          # Fallback search in case Craft changes its package destination layout.
+          if ($binaryCount -eq 0 -and (Test-Path $env:CRAFT_ROOT)) {
+            $packages = Get-ChildItem $env:CRAFT_ROOT -Recurse -File -ErrorAction SilentlyContinue |
               Where-Object {
                 $_.Extension -in '.exe','.zip','.7z' -and
                 ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
+              } |
+              Select-Object -First 10
             foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
+              Copy-Item $p.FullName (Join-Path 'artifacts/windows' $p.Name) -Force
+              $binaryCount++
             }
           }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
 
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
+          Get-ChildItem artifacts/windows -File | Format-Table Name, Length
+          if ($binaryCount -eq 0) {
+            throw 'No runnable Update P5 Edit Aja Windows package was produced.'
+          }
+          # A successful fallback supersedes the optional directory query's
+          # exit code, which the Actions PowerShell wrapper otherwise reuses.
+          $global:LASTEXITCODE = 0
+
+      - name: Upload Update P5 Edit Aja Windows package
+        if: ${{ success() && steps.windows_package.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
+          path: artifacts/windows/*
           if-no-files-found: error
           retention-days: 14
-) {
-            if ($text -match '(?m)^DriveLetter\s*=') {
-              $text = [regex]::Replace($text, '(?m)^DriveLetter\s*=.*
 
-      - name: Patch Craft gettext MinGW libxml2 linking
-        shell: pwsh
-        run: |
-          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
-          if (-not (Test-Path $gettextBlueprint)) {
-            throw "Craft gettext blueprint not found: $gettextBlueprint"
-          }
-
-          @'
-          from pathlib import Path
-
-          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
-          s = p.read_text(encoding="utf-8")
-          needle = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          replacement = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMinGW():\n'
-              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
-              '            # libgettextsrc link line can omit the import library.\n'
-              '            # LIBS is propagated by configure to the final libtool link.\n'
-              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          if needle not in s:
-              raise SystemExit("Could not locate gettext MinGW configure insertion point")
-          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
-          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
-
-          python patch_gettext_libxml2.py
-
-          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
-            throw 'gettext MinGW libxml2 hotfix verification failed'
-          }
-
-      - name: Install Update P5 Edit Aja Craft blueprint
-        shell: pwsh
-        run: |
-          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-          if (-not $blueprintRoot) {
-            throw 'Could not locate the KDE Craft blueprint root'
-          }
-          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
-          New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item craft/editaja/* $target -Recurse -Force
-          Write-Host "Update P5 Edit Aja blueprint: $target"
-          Get-ChildItem $target
-
-      - name: Build Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Package Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
+      - name: Upload verified corresponding source
+        if: ${{ always() && steps.corresponding_source.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
-, 'DriveLetter = Q')
-            } else {
-              $text = [regex]::Replace($text, '(?m)^\[ShortPath\]\s*
-
-      - name: Patch Craft gettext MinGW libxml2 linking
-        shell: pwsh
-        run: |
-          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
-          if (-not (Test-Path $gettextBlueprint)) {
-            throw "Craft gettext blueprint not found: $gettextBlueprint"
-          }
-
-          @'
-          from pathlib import Path
-
-          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
-          s = p.read_text(encoding="utf-8")
-          needle = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          replacement = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMinGW():\n'
-              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
-              '            # libgettextsrc link line can omit the import library.\n'
-              '            # LIBS is propagated by configure to the final libtool link.\n'
-              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          if needle not in s:
-              raise SystemExit("Could not locate gettext MinGW configure insertion point")
-          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
-          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
-
-          python patch_gettext_libxml2.py
-
-          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
-            throw 'gettext MinGW libxml2 hotfix verification failed'
-          }
-
-      - name: Install Update P5 Edit Aja Craft blueprint
-        shell: pwsh
-        run: |
-          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-          if (-not $blueprintRoot) {
-            throw 'Could not locate the KDE Craft blueprint root'
-          }
-          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
-          New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item craft/editaja/* $target -Recurse -Force
-          Write-Host "Update P5 Edit Aja blueprint: $target"
-          Get-ChildItem $target
-
-      - name: Build Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Package Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
-, "[ShortPath]`r`nDriveLetter = Q")
-            }
-          } else {
-            $text += "`r`n[ShortPath]`r`nDriveLetter = Q`r`n"
-          }
-          Set-Content -Path $cfg -Value $text -Encoding UTF8
-          $verify = Get-Content $cfg -Raw
-          if ($verify -notmatch '(?ms)^\[ShortPath\].*?^DriveLetter\s*=\s*Q\s*
-
-      - name: Patch Craft gettext MinGW libxml2 linking
-        shell: pwsh
-        run: |
-          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
-          if (-not (Test-Path $gettextBlueprint)) {
-            throw "Craft gettext blueprint not found: $gettextBlueprint"
-          }
-
-          @'
-          from pathlib import Path
-
-          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
-          s = p.read_text(encoding="utf-8")
-          needle = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          replacement = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMinGW():\n'
-              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
-              '            # libgettextsrc link line can omit the import library.\n'
-              '            # LIBS is propagated by configure to the final libtool link.\n'
-              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          if needle not in s:
-              raise SystemExit("Could not locate gettext MinGW configure insertion point")
-          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
-          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
-
-          python patch_gettext_libxml2.py
-
-          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
-            throw 'gettext MinGW libxml2 hotfix verification failed'
-          }
-
-      - name: Install Update P5 Edit Aja Craft blueprint
-        shell: pwsh
-        run: |
-          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-          if (-not $blueprintRoot) {
-            throw 'Could not locate the KDE Craft blueprint root'
-          }
-          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
-          New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item craft/editaja/* $target -Recurse -Force
-          Write-Host "Update P5 Edit Aja blueprint: $target"
-          Get-ChildItem $target
-
-      - name: Build Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Package Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
-          if-no-files-found: error
-          retention-days: 14
-) {
-            throw 'Craft ShortPath DriveLetter configuration failed'
-          }
-          Get-Content $cfg | Select-String 'ABI|MakeProgram|ShortPath|DriveLetter'
-
-      - name: Patch Craft gettext MinGW libxml2 linking
-        shell: pwsh
-        run: |
-          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
-          if (-not (Test-Path $gettextBlueprint)) {
-            throw "Craft gettext blueprint not found: $gettextBlueprint"
-          }
-
-          @'
-          from pathlib import Path
-
-          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
-          s = p.read_text(encoding="utf-8")
-          needle = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          replacement = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMinGW():\n'
-              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
-              '            # libgettextsrc link line can omit the import library.\n'
-              '            # LIBS is propagated by configure to the final libtool link.\n'
-              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          if needle not in s:
-              raise SystemExit("Could not locate gettext MinGW configure insertion point")
-          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
-          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
-
-          python patch_gettext_libxml2.py
-
-          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
-            throw 'gettext MinGW libxml2 hotfix verification failed'
-          }
-
-      - name: Install Update P5 Edit Aja Craft blueprint
-        shell: pwsh
-        run: |
-          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-          if (-not $blueprintRoot) {
-            throw 'Could not locate the KDE Craft blueprint root'
-          }
-          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
-          New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item craft/editaja/* $target -Recurse -Force
-          Write-Host "Update P5 Edit Aja blueprint: $target"
-          Get-ChildItem $target
-
-      - name: Build Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Package Update P5 Edit Aja
-        shell: pwsh
-        run: |
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      - name: Collect Windows package
-        if: always()
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          if (Test-Path "$env:CRAFT_ROOT\tmp") {
-            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              }
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
-            }
-          }
-          Get-ChildItem artifacts -File | Format-Table Name, Length
-
-      - name: Upload Update P5 Edit Aja artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Update-P5-Edit-Aja-Windows-x64
-          path: artifacts/*
+          name: Update-P5-Edit-Aja-Source
+          path: artifacts/Update-P5-Edit-Aja-Source.zip
           if-no-files-found: error
           retention-days: 14
