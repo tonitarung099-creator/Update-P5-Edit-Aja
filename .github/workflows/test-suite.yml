@@ -1,0 +1,79 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Compile Python sources
+        run: python -m compileall -q tools scripts tests
+
+      - name: Run complete unit and integration test suite
+        run: python -m unittest discover -s tests -v
+
+      - name: Validate bundled AI Edit examples
+        run: |
+          python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/documentary-basic.json
+          python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/chatgpt-portable.json
+
+      - name: Validate capability registry CLI
+        shell: bash
+        run: |
+          set +e
+          python tools/capability_registry/capability_registry.py --json >/tmp/capabilities.json
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then
+            exit "$status"
+          fi
+          test -s /tmp/capabilities.json
+
+      - name: Validate creator pipeline dry run
+        run: |
+          python tools/creator_pipeline/creator_pipeline.py             creator/examples/documentary-pipeline.json             --dry-run             --workdir /tmp/update-p5-pipeline
+
+      - name: Validate Film Context tool catalog
+        run: |
+          python tools/film_context/film_context.py tool-catalog > /tmp/film-context-tools.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/film-context-tools.json').read_text(encoding='utf-8'))
+          names = {tool['name'] for tool in data['tools']}
+          expected = {
+              'movie_context_status',
+              'movie_search',
+              'movie_get_scene',
+              'movie_get_context',
+              'movie_get_keyframes',
+          }
+          if names != expected:
+              raise SystemExit(f'Unexpected Film Context tool catalog: {sorted(names)}')
+          PY
+
+      - name: Validate workflow preset generation
+        run: |
+          python tools/workflow_presets/workflow_presets.py documentary             --transcript transcript.json             --rhythm rhythm.json             --output /tmp/pipeline.json
+          test -s /tmp/pipeline.json
