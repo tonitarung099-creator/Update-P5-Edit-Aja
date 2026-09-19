@@ -1,11 +1,11 @@
 import base64
 import bz2
 import hashlib
-import pathlib
 import unittest
 
+from tests.build_contract import ROOT, apply_entry, patch_entry
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+
 PATCH_FILE = ROOT / "patches" / "phase14-local-edit-preview-history.patch.bz2.b64"
 EXPECTED_SHA256 = "864aa6d7aeee21a965df407c1be2b9da7dde744cc065eccb698d7e5fdca7c248"
 
@@ -55,13 +55,18 @@ class LocalEditPreviewHistoryPatchTests(unittest.TestCase):
 
     def test_build_chain_contains_phase14(self):
         blueprint = (ROOT / "craft" / "editaja" / "editaja.py").read_text(encoding="utf-8")
-        workflow = (ROOT / ".github" / "workflows" / "build-windows.yml").read_text(encoding="utf-8")
+        verifier = (ROOT / "scripts" / "verify_p5_source.py").read_text(encoding="utf-8")
+
+        patch = patch_entry("phase14")
+        apply = apply_entry("phase14")
+
         self.assertIn('("phase14.patch", 1)', blueprint)
-        self.assertIn("PHASE14_SHA256", workflow)
-        self.assertIn("phase14-local-edit-preview-history.patch.bz2.b64", workflow)
-        self.assertIn("craft/editaja/phase14.patch", workflow)
-        self.assertIn("Local Edit History", workflow)
-        self.assertIn("creatorLocalEditPreview", workflow)
+        self.assertEqual(patch["sha256"], EXPECTED_SHA256)
+        self.assertEqual(patch["sources"], ["patches/phase14-local-edit-preview-history.patch.bz2.b64"])
+        self.assertEqual(patch["output"], "craft/editaja/phase14.patch")
+        self.assertEqual(apply["strip"], 1)
+        self.assertIn("Local Edit History", verifier)
+        self.assertIn("creatorLocalEditPreview", verifier)
 
 
 if __name__ == "__main__":
