@@ -26,7 +26,7 @@ native clips on a montage track
 
 ```text
 python tools/smart_montage/smart_montage.py rhythm.json \
-  documentary/examples/smart-montage.json \
+  examples/documentary/smart-montage.json \
   --start 10 \
   --end 30 \
   --every 2 \

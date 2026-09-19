@@ -54,7 +54,7 @@ Then:
 
 ```text
 python tools/broll_planner/broll_planner.py assets \
-  broll-plan.json documentary/examples/broll-assets.json \
+  broll-plan.json examples/documentary/broll-assets.json \
   --output broll-assets.edit.json
 ```
 

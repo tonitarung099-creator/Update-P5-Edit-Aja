@@ -52,7 +52,8 @@ class FilmContextNativePatchTests(unittest.TestCase):
     def test_windows_build_contract(self):
         workflow = (ROOT / ".github" / "workflows" / "build-windows.yml").read_text(encoding="utf-8")
         verifier = (ROOT / "scripts" / "verify_p5_source.py").read_text(encoding="utf-8")
-        reconstruct = (ROOT / "scripts" / "windows" / "reconstruct-source.ps1").read_text(encoding="utf-8")
+        reconstruct = (ROOT / "scripts" / "reconstruct_source.py").read_text(encoding="utf-8")
+        windows_wrapper = (ROOT / "scripts" / "windows" / "reconstruct-source.ps1").read_text(encoding="utf-8")
         gettext_patcher = (ROOT / "scripts" / "patch_gettext_blueprint.py").read_text(encoding="utf-8")
 
         patch = patch_entry("phase15")
@@ -65,13 +66,17 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertEqual(apply["strip"], 1)
         self.assertEqual(payload["destination"], "craft/editaja/film_context.txt")
         self.assertIn("film_context.py", reconstruct)
+        self.assertIn("shutil.copy2", reconstruct)
+        self.assertIn("python scripts/reconstruct_source.py", windows_wrapper)
         self.assertIn("movie_search", verifier)
         self.assertIn("Build Visual Index", verifier)
         self.assertIn("Patch Craft gettext MinGW libxml2 linking", workflow)
+        self.assertIn("P5 Quality Gates", workflow)
+        self.assertIn("workflow_run", workflow)
         self.assertIn("LIBS=-lxml2", gettext_patcher)
 
     def test_ai_edit_json_stays_separate(self):
-        docs = (ROOT / "FILM_CONTEXT.md").read_text(encoding="utf-8")
+        docs = (ROOT / "docs" / "features" / "FILM_CONTEXT.md").read_text(encoding="utf-8")
         self.assertIn("Film Context itself never edits the timeline", docs)
         self.assertIn("AI Edit JSON", docs)
 

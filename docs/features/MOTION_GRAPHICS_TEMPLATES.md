@@ -13,7 +13,7 @@ Implemented templates:
 
 ```text
 python tools/motion_graphics_templates/motion_graphics_templates.py \
-  documentary/examples/motion-graphics-templates.json \
+  examples/documentary/motion-graphics-templates.json \
   --output-dir generated-motion \
   --plan-output motion.edit.json
 ```
