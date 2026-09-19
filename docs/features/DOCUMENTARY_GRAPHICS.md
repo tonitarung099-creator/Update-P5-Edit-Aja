@@ -17,7 +17,7 @@ Implemented:
 
 ```text
 python tools/documentary_graphics/documentary_graphics.py \
-  documentary/examples/japan-data-graphics.json \
+  examples/documentary/japan-data-graphics.json \
   --output-dir generated-graphics \
   --plan-output graphics.edit.json
 ```
