@@ -254,6 +254,22 @@ jobs:
           python-version: '3.11'
       - name: Test packaging preflight and real Windows junctions
         run: python -m unittest tests.test_packaging_images -v
+      - name: Read pinned Craft revision for integration tests
+        id: craft-test-revision
+        shell: pwsh
+        run: |
+          $manifest = Get-Content build/build-manifest.json -Raw | ConvertFrom-Json
+          "revision=$($manifest.craft.revision)" >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          repository: KDE/craft
+          ref: ${{ steps.craft-test-revision.outputs.revision }}
+          path: .craft-preflight-fixture/craft
+          persist-credentials: false
+      - name: Test preflight CLI with actual pinned Craft
+        env:
+          P5_CRAFT_TEST_SOURCE: .craft-preflight-fixture/craft
+        run: python -m unittest tests.test_craft_preflight_integration -v
 
   source-reconstruction:
     name: Source / Reconstruction
