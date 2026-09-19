@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-windows.yml'
+      - 'build/**'
       - 'patches/**'
       - 'branding/**'
       - 'scripts/**'
@@ -26,13 +27,6 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 360
     env:
-      UPSTREAM_COMMIT: c3d8a38c04470f6726b21485fc488f2cd2921654
-      PHASE5_SHA256: 682be7bcb5afd875eb5f347ecd8f644be5fa1273e175c027ddd1d67491ac9a65
-      PHASE6_SHA256: 975a7c253f125fc5350aec2f835c2eeed0d7c3b2a3cfe5766810d12244985f37
-      PHASE12_SHA256: d8729f8d3cbe09e7818d5d5a4ab8cc690a45ac9f6982fdf98d0ded6732665652
-      PHASE13_SHA256: 9826b9ec0a5252827cb34b8aa4f4b904a6bcf83c4ec302ad0e6893dd1bc195bc
-      PHASE14_SHA256: 864aa6d7aeee21a965df407c1be2b9da7dde744cc065eccb698d7e5fdca7c248
-      PHASE15_SHA256: a8dc28c9e679d65d0551f997515ee0603983e373d1ab545def8d7fd5593e217a
       CRAFT_ROOT: C:\CraftRoot
       CRAFT_BUILD_TYPE: RelWithDebInfo
 
@@ -40,286 +34,49 @@ jobs:
       - name: Checkout Update P5 Edit Aja build repository
         uses: actions/checkout@v4
 
-      - name: Reassemble and verify source patches
+      - name: Prepare pinned build inputs
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches'); n=['00','01','02','03','04.00','04.01','04.02','05.00','05.01','05.02']; s=''.join((p/f'phase5.patch.bz2.b64.{x}').read_text() for x in n); out=bz2.decompress(base64.b64decode(s)); h=hashlib.sha256(out).hexdigest(); print('Phase 5 SHA-256:',h); assert h=='$env:PHASE5_SHA256'; pathlib.Path('craft/editaja/phase5.patch').write_bytes(out)"
-          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase6-ai-edit-json.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 6 SHA-256:',h); assert h=='$env:PHASE6_SHA256'; pathlib.Path('craft/editaja/phase6.patch').write_bytes(out)"
-          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase12-local-edit-native.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 12 SHA-256:',h); assert h=='$env:PHASE12_SHA256'; pathlib.Path('craft/editaja/phase12.patch').write_bytes(out)"
-          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase13-local-edit-scene-undo.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 13 SHA-256:',h); assert h=='$env:PHASE13_SHA256'; pathlib.Path('craft/editaja/phase13.patch').write_bytes(out)"
-          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase14-local-edit-preview-history.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 14 SHA-256:',h); assert h=='$env:PHASE14_SHA256'; pathlib.Path('craft/editaja/phase14.patch').write_bytes(out)"
-          python -c "import base64,bz2,hashlib,pathlib; p=pathlib.Path('patches/phase15-film-context-native.patch.bz2.b64'); out=bz2.decompress(base64.b64decode(p.read_text())); h=hashlib.sha256(out).hexdigest(); print('Phase 15 SHA-256:',h); assert h=='$env:PHASE15_SHA256'; pathlib.Path('craft/editaja/phase15.patch').write_bytes(out)"
-          Copy-Item tools/film_context/film_context.py craft/editaja/film_context.txt -Force
-          Copy-Item patches/build-fixes.patch craft/editaja/build-fixes.patch -Force
-          Copy-Item branding/editaja-logo.png.b64 craft/editaja/editaja-logo.png.b64 -Force
-          Copy-Item scripts/apply_branding.py craft/editaja/apply_branding.txt -Force
+          python scripts/prepare_build_inputs.py
 
       - name: Reconstruct and verify corresponding source
         id: corresponding_source
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          New-Item -ItemType Directory -Force corresponding-source | Out-Null
-          git -C corresponding-source init
-          git -C corresponding-source remote add origin https://github.com/KDE/kdenlive.git
-          git -C corresponding-source fetch --depth 1 origin $env:UPSTREAM_COMMIT
-          git -C corresponding-source checkout --detach FETCH_HEAD
-          git -C corresponding-source apply --ignore-space-change -p2 "$env:GITHUB_WORKSPACE\craft\editaja\phase5.patch"
-          git -C corresponding-source apply --check "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
-          git -C corresponding-source apply "$env:GITHUB_WORKSPACE\patches\build-fixes.patch"
-          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase6.patch"
-          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase12.patch"
-          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase13.patch"
-          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase14.patch"
-          git -C corresponding-source apply --ignore-space-change -p1 "$env:GITHUB_WORKSPACE\craft\editaja\phase15.patch"
-          New-Item -ItemType Directory -Force corresponding-source/data/scripts/filmcontext | Out-Null
-          Copy-Item tools/film_context/film_context.py corresponding-source/data/scripts/filmcontext/film_context.py -Force
-          python scripts/apply_branding.py corresponding-source --assets branding
-          if (-not (Select-String -Path corresponding-source/src/main.cpp -Pattern 'i18n\("Update P5 Edit Aja"\)' -Quiet)) {
-            throw 'Update P5 Edit Aja branding verification failed'
-          }
-          if (-not (Test-Path corresponding-source/src/aiassistant/aiassistantwidget.cpp)) {
-            throw 'Phase 5 AI assistant source is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'AI Edit JSON' -Quiet)) {
-            throw 'Phase 6 AI Edit JSON UI is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'Local Edit.*Lightweight' -Quiet)) {
-            throw 'Phase 12 Local Edit UI is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/mainwindow.cpp -Pattern 'kdenlive_set_transform_keyframes' -Quiet)) {
-            throw 'Phase 12 native Transform keyframe tool is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/mainwindow.cpp -Pattern 'kdenlive_get_scene_map' -Quiet)) {
-            throw 'Phase 13 Scene Detection map tool is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'beginMacro.*Local Edit: Zoom snapshots' -Quiet)) {
-            throw 'Phase 13 Local Edit single-undo grouping is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'Local Edit History' -Quiet)) {
-            throw 'Phase 14 Local Edit History UI is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/mainwindow.cpp -Pattern 'creatorLocalEditPreview' -Quiet)) {
-            throw 'Phase 14 Creator Workspace preview control is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'Film Context' -Quiet)) {
-            throw 'Phase 15 Film Context optional UI is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'movie_search' -Quiet)) {
-            throw 'Phase 15 Film Context agent tools are missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/aiassistantwidget.cpp -Pattern 'Build Visual Index \(Optional\)' -Quiet)) {
-            throw 'Phase 15 optional visual index UI is missing'
-          }
-          if (-not (Select-String -Path corresponding-source/src/aiassistant/openaicompatibleagent.cpp -Pattern 'agent_image_paths' -Quiet)) {
-            throw 'Phase 15 multi-keyframe vision handoff is missing'
-          }
-          if (-not (Test-Path corresponding-source/data/scripts/filmcontext/film_context.py)) {
-            throw 'Phase 15 local Film Context backend is missing'
-          }
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          Remove-Item -Recurse -Force corresponding-source/.git
-          Compress-Archive -Path corresponding-source/* -DestinationPath artifacts/Update-P5-Edit-Aja-Source.zip -CompressionLevel Optimal
+        run: ./scripts/windows/reconstruct-source.ps1
 
-      - name: Bootstrap KDE Craft with MinGW x64
+      - name: Bootstrap pinned KDE Craft with MinGW x64
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $env:PATH = (($env:PATH -split ';') | Where-Object {
-            $_ -and
-            $_ -notmatch '(?i)\\Git\\bin$' -and
-            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
-            $_ -notmatch '(?i)\\mingw64\\bin$' -and
-            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
-          }) -join ';'
-
-          New-Item -ItemType Directory -Force "$env:CRAFT_ROOT\download" | Out-Null
-          $bootstrap = "$env:CRAFT_ROOT\download\CraftBootstrap.py"
-          Invoke-WebRequest https://raw.githubusercontent.com/KDE/craft/master/setup/CraftBootstrap.py -OutFile $bootstrap
-
-          @'
-          from pathlib import Path
-          p = Path(r"C:\CraftRoot\download\CraftBootstrap.py")
-          s = p.read_text(encoding="utf-8")
-          needle = '            ("msvc2022", "cl"),\n            returnDefaultWithoutPrompt=args.use_defaults,'
-          replacement = '            (None, "gcc"),\n            returnDefaultWithoutPrompt=args.use_defaults,'
-          if needle not in s:
-              raise SystemExit("Could not locate Craft Windows compiler default")
-          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
-          '@ | Set-Content -Path patch_craft_bootstrap.py -Encoding UTF8
-
-          python patch_craft_bootstrap.py
-          python $bootstrap --prefix $env:CRAFT_ROOT --branch master --use-defaults
-
-          $cfg = Join-Path $env:CRAFT_ROOT 'etc\CraftSettings.ini'
-          if (-not (Test-Path $cfg)) {
-            throw "Craft settings not found: $cfg"
-          }
-          python scripts/configure_craft.py $cfg
-          Get-Content $cfg | Select-String 'ABI|BuildType|UseNinja|MakeProgram|ShortPath|DriveLetter|UseCache'
+        run: ./scripts/windows/bootstrap-craft.ps1
 
       - name: Patch Craft gettext MinGW libxml2 linking
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
-          if (-not (Test-Path $gettextBlueprint)) {
-            throw "Craft gettext blueprint not found: $gettextBlueprint"
-          }
-
-          @'
-          from pathlib import Path
-
-          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
-          s = p.read_text(encoding="utf-8")
-          needle = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          replacement = (
-              '            "gl_cv_libxml_use_included=no",\n'
-              '        ]\n\n'
-              '        if CraftCore.compiler.isMinGW():\n'
-              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
-              '            # libgettextsrc link line can omit the import library.\n'
-              '            # LIBS is propagated by configure to the final libtool link.\n'
-              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
-              '        if CraftCore.compiler.isMSVC():'
-          )
-          if needle not in s:
-              raise SystemExit("Could not locate gettext MinGW configure insertion point")
-          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
-          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
-
-          python patch_gettext_libxml2.py
-
-          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
-            throw 'gettext MinGW libxml2 hotfix verification failed'
-          }
+        run: ./scripts/windows/patch-gettext.ps1
 
       - name: Install Update P5 Edit Aja Craft blueprint
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-          if (-not $blueprintRoot) {
-            throw 'Could not locate the KDE Craft blueprint root'
-          }
-          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
-          New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item craft/editaja/* $target -Recurse -Force
-          Write-Host "Update P5 Edit Aja blueprint: $target"
-          Get-ChildItem $target
+        run: ./scripts/windows/install-blueprint.ps1
 
       - name: Install dependencies from KDE binary cache
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
-          foreach ($property in $setup.PSObject.Properties) {
-            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
-          }
-          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
-          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --use-cache --install-deps kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: ./scripts/windows/invoke-craft.ps1 -Mode install-deps
 
       - name: Build Update P5 Edit Aja
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
-          foreach ($property in $setup.PSObject.Properties) {
-            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
-          }
-          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
-
-          # Dependencies were installed above from KDE's binary cache.
-          # --no-cache here intentionally builds our modified Edit Aja source.
-          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --no-cache kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: ./scripts/windows/invoke-craft.ps1 -Mode build
 
       - name: Install Windows packager
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
-          foreach ($property in $setup.PSObject.Properties) {
-            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
-          }
-          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
-          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --use-cache --update nsis
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: ./scripts/windows/invoke-craft.ps1 -Mode install-packager
 
       - name: Package Update P5 Edit Aja
         shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
-          foreach ($property in $setup.PSObject.Properties) {
-            Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
-          }
-          $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
-          python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE --package kde/kdemultimedia/editaja
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: ./scripts/windows/invoke-craft.ps1 -Mode package
 
       - name: Collect Windows package
         id: windows_package
         shell: pwsh
-        run: |
-          # Run only after a successful build and package step. Keep source
-          # archives out of the directory published as the Windows application.
-          New-Item -ItemType Directory -Force artifacts/windows | Out-Null
-          $binaryCount = 0
-
-          if (Test-Path "$env:CRAFT_ROOT\craft\bin\craft.py") {
-            $setup = ConvertFrom-Json (& python "$env:CRAFT_ROOT\craft\bin\CraftSetupHelper.py" --setup --format=json)
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            foreach ($property in $setup.PSObject.Properties) {
-              Set-Item -Force -Path "Env:$($property.Name)" -Value "$($property.Value)"
-            }
-            $craft = "$env:CRAFT_ROOT\craft\bin\craft.py"
-            $packageDirOutput = & python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE -q --get "packageDestinationDir()" virtual/base 2>$null
-            # An empty query result must still allow the fallback search below.
-            $packageDir = "$($packageDirOutput | Select-Object -Last 1)".Trim()
-
-            if ($packageDir -and (Test-Path $packageDir)) {
-              Write-Host "Craft package directory: $packageDir"
-              $packages = Get-ChildItem $packageDir -Recurse -File -ErrorAction SilentlyContinue |
-                Where-Object {
-                  $_.Extension -in '.exe','.zip','.7z','.sha256' -and
-                  ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-                }
-              foreach ($p in $packages) {
-                Copy-Item $p.FullName (Join-Path 'artifacts/windows' $p.Name) -Force
-                if ($p.Extension -in '.exe','.zip','.7z') { $binaryCount++ }
-              }
-            }
-          }
-
-          # Fallback search in case Craft changes its package destination layout.
-          if ($binaryCount -eq 0 -and (Test-Path $env:CRAFT_ROOT)) {
-            $packages = Get-ChildItem $env:CRAFT_ROOT -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Extension -in '.exe','.zip','.7z' -and
-                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-              } |
-              Select-Object -First 10
-            foreach ($p in $packages) {
-              Copy-Item $p.FullName (Join-Path 'artifacts/windows' $p.Name) -Force
-              $binaryCount++
-            }
-          }
-
-          Get-ChildItem artifacts/windows -File | Format-Table Name, Length
-          if ($binaryCount -eq 0) {
-            throw 'No runnable Update P5 Edit Aja Windows package was produced.'
-          }
-          # A successful fallback supersedes the optional directory query's
-          # exit code, which the Actions PowerShell wrapper otherwise reuses.
-          $global:LASTEXITCODE = 0
+        run: ./scripts/windows/collect-package.ps1
 
       - name: Upload Update P5 Edit Aja Windows package
         if: ${{ success() && steps.windows_package.outcome == 'success' }}

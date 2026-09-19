@@ -4,8 +4,9 @@ import hashlib
 import pathlib
 import unittest
 
+from tests.build_contract import ROOT, apply_entry, patch_entry
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+
 PATCH_FILE = ROOT / "patches" / "phase12-local-edit-native.patch.bz2.b64"
 EXPECTED_SHA256 = "d8729f8d3cbe09e7818d5d5a4ab8cc690a45ac9f6982fdf98d0ded6732665652"
 
@@ -53,11 +54,20 @@ class LocalEditNativePatchTests(unittest.TestCase):
     def test_build_pipeline_applies_phase12(self):
         blueprint = (ROOT / "craft" / "editaja" / "editaja.py").read_text(encoding="utf-8")
         workflow = (ROOT / ".github" / "workflows" / "build-windows.yml").read_text(encoding="utf-8")
+        verifier = (ROOT / "scripts" / "verify_p5_source.py").read_text(encoding="utf-8")
+
+        patch = patch_entry("phase12")
+        apply = apply_entry("phase12")
+
         self.assertIn('("phase12.patch", 1)', blueprint)
-        self.assertIn("PHASE12_SHA256", workflow)
-        self.assertIn("phase12-local-edit-native.patch.bz2.b64", workflow)
-        self.assertIn("craft/editaja/phase12.patch", workflow)
-        self.assertIn("kdenlive_set_transform_keyframes", workflow)
+        self.assertEqual(patch["sha256"], EXPECTED_SHA256)
+        self.assertEqual(patch["sources"], ["patches/phase12-local-edit-native.patch.bz2.b64"])
+        self.assertEqual(patch["output"], "craft/editaja/phase12.patch")
+        self.assertEqual(apply["strip"], 1)
+        self.assertTrue(apply["ignore_space_change"])
+        self.assertIn("prepare_build_inputs.py", workflow)
+        self.assertIn("reconstruct-source.ps1", workflow)
+        self.assertIn("kdenlive_set_transform_keyframes", verifier)
 
 
 if __name__ == "__main__":

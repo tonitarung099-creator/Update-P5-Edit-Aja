@@ -1,11 +1,11 @@
 import base64
 import bz2
 import hashlib
-import pathlib
 import unittest
 
+from tests.build_contract import ROOT, apply_entry, patch_entry
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+
 PATCH_FILE = ROOT / "patches" / "phase13-local-edit-scene-undo.patch.bz2.b64"
 EXPECTED_SHA256 = "9826b9ec0a5252827cb34b8aa4f4b904a6bcf83c4ec302ad0e6893dd1bc195bc"
 
@@ -41,11 +41,18 @@ class LocalEditSceneUndoPatchTests(unittest.TestCase):
 
     def test_build_chain_contains_phase13(self):
         blueprint = (ROOT / "craft" / "editaja" / "editaja.py").read_text(encoding="utf-8")
-        workflow = (ROOT / ".github" / "workflows" / "build-windows.yml").read_text(encoding="utf-8")
+        verifier = (ROOT / "scripts" / "verify_p5_source.py").read_text(encoding="utf-8")
+
+        patch = patch_entry("phase13")
+        apply = apply_entry("phase13")
+
         self.assertIn('("phase13.patch", 1)', blueprint)
-        self.assertIn("PHASE13_SHA256", workflow)
-        self.assertIn("phase13-local-edit-scene-undo.patch.bz2.b64", workflow)
-        self.assertIn("craft/editaja/phase13.patch", workflow)
+        self.assertEqual(patch["sha256"], EXPECTED_SHA256)
+        self.assertEqual(patch["sources"], ["patches/phase13-local-edit-scene-undo.patch.bz2.b64"])
+        self.assertEqual(patch["output"], "craft/editaja/phase13.patch")
+        self.assertEqual(apply["strip"], 1)
+        self.assertIn("kdenlive_get_scene_map", verifier)
+        self.assertIn("Local Edit: Zoom snapshots", verifier)
 
 
 if __name__ == "__main__":
