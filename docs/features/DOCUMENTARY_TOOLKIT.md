@@ -16,7 +16,7 @@ Implemented building blocks:
 
 ```text
 python tools/documentary_toolkit/documentary_toolkit.py compile \
-  documentary/examples/japan-documentary.json \
+  examples/documentary/japan-documentary.json \
   --output japan-graphics.edit.json
 ```
 
