@@ -20,3 +20,15 @@ Pinned external revisions and patch hashes are stored in
 When a build fails, start with the failed GitHub Actions step and edit only the
 script responsible for that step. Avoid putting build logic back into
 `.github/workflows/build-windows.yml`.
+
+
+## Packaging image compatibility
+
+`prepare-package-images.ps1` runs immediately before Craft packaging. Craft's
+Windows bootstrap may install toolchain images as `MinSizeRel` while the
+application build uses `RelWithDebInfo`. The Craft packager requires an image
+directory for every runtime/packaging dependency, so the helper creates
+temporary Windows directory junctions only when the expected image is missing
+and a compatible image for the exact same dependency target already exists.
+
+The helper fails instead of guessing when no compatible image is available.
