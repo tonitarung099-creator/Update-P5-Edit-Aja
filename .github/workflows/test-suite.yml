@@ -47,6 +47,7 @@ jobs:
             tests: >-
               tests.test_ai_edit
               tests.test_ai_edit_compose
+              tests.test_asset_manifest
               tests.test_capability_registry
               tests.test_creator_pipeline
               tests.test_film_context
@@ -56,6 +57,7 @@ jobs:
               tests.test_local_edit_scene_undo_patch
               tests.test_local_edit_preview_history_patch
               tests.test_phase_integration
+              tests.test_workflow_presets
 
           - name: Media Editorial
             tests: >-
