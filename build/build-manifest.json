@@ -48,7 +48,7 @@
       "sources": [
         "patches/phase13-local-edit-scene-undo.patch.bz2.b64"
       ],
-      "sha256": "9826b9ec0a5252827cb34b8aa4f4b904a6bcf83c4ec302ad0e6893dd1bc195bc",
+      "sha256": "a553eb5f1213e055a95bd8653039e978e6ba950db2ff627e7b471aa176e9f39b",
       "output": "craft/editaja/phase13.patch"
     },
     {
