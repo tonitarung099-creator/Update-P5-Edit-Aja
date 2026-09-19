@@ -74,6 +74,8 @@ class subinfo(info.infoclass):
 class Package(CraftPackageObject.get("kde").pattern):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Shared by packaging and the dependency-image preflight.
+        self.ignoredPackages.extend(["libs/llvm", "data/hunspell-dictionaries", "binary/mysql"])
         self.subinfo.options.configure.args += [
             f"-DFETCH_OTIO={CraftCore.compiler.isMacOS.asOnOff}",
             f"-DUSE_DBUS={CraftCore.compiler.isLinux.asOnOff}",
@@ -111,9 +113,6 @@ class Package(CraftPackageObject.get("kde").pattern):
             self.blacklist_file.append(upstream_exclude)
 
         self.addExecutableFilter(r"bin/(?!(ff|kdenlive|kioworker|melt|update-mime-database|snoretoast|drmingw|data/kdenlive)).*")
-        self.ignoredPackages.append("libs/llvm")
-        self.ignoredPackages.append("data/hunspell-dictionaries")
-        self.ignoredPackages.append("binary/mysql")
 
         self.defines["appname"] = "editaja"
         self.defines["icon"] = self.sourceDir() / "data/icons/kdenlive.ico"

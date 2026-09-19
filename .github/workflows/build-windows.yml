@@ -64,6 +64,10 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/invoke-craft.ps1 -Mode install-packager
 
+      - name: Prepare dependency images for packaging
+        shell: pwsh
+        run: ./scripts/windows/prepare-package-images.ps1
+
       - name: Package Update P5 Edit Aja
         shell: pwsh
         run: ./scripts/windows/invoke-craft.ps1 -Mode package

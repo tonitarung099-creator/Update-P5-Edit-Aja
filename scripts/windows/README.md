@@ -20,3 +20,25 @@ Pinned external revisions and patch hashes are stored in
 When a build fails, start with the failed GitHub Actions step and edit only the
 script responsible for that step. Avoid putting build logic back into
 `.github/workflows/build-windows.yml`.
+
+
+## Packaging image compatibility
+
+`prepare-package-images.ps1` runs immediately before Craft packaging. Craft's
+Windows bootstrap may install toolchain images as `MinSizeRel` while the
+application build uses `RelWithDebInfo`. The Craft packager requires an image
+directory for every runtime/packaging dependency. Build #51's log confirms
+`libs/runtime` installed the MinGW 14.2.0 DLLs in `image-MinSizeRel-14.2.0`,
+then packaging looked for `image-RelWithDebInfo-14.2.0`.
+
+The helper permits a temporary directory junction only for `libs/runtime`,
+using an exact same-target release image. Debug images, other versions, missing
+application images, and missing images of other dependencies fail explicitly.
+It checks all required images before creating any junction. Package exclusions
+are initialized in the blueprint constructor so preflight and Craft packaging
+use the same dependency set.
+
+Regression tests exercise the dependency traversal and failure paths. The
+Windows quality gate also creates a real junction and checks file access,
+existing-destination failure, and preservation of the source after removal.
+This gate does not replace testing the final installer and application.
