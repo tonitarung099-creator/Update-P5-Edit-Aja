@@ -14,8 +14,7 @@ ALLOWED_ROOT_MARKDOWN = {
 
 ALLOWED_WORKFLOW_YAML = {
     "build-windows.yml",
-    "test-suite.yml",
-    "validate-build.yml",
+    "quality-gates.yml",
 }
 
 
@@ -54,7 +53,6 @@ class RepositoryLayoutTests(unittest.TestCase):
         per_feature = [
             path.name
             for path in workflow_dir.glob("test-*.yml")
-            if path.name != "test-suite.yml"
         ]
         self.assertEqual(per_feature, [])
 
