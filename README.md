@@ -106,7 +106,7 @@ These engines intentionally feed the same Phase 6 AI Edit/native tool layer rath
 
 ## Documentation
 
-Feature documentation is indexed in `docs/features/README.md`. Build and debugging instructions live in `BUILDING.md`.
+Feature documentation is indexed in `docs/features/README.md`. Build and debugging instructions live in `BUILDING.md`. AI/developer engineering behavior is governed by `AGENTS.md` and the detailed evidence-first rules in `docs/AI_WORKING_RULES.md`; a standalone copy/paste prompt is available at `docs/ai/PROMPT_AI_TECHNICAL_LEAD_V2_EDIT_AJA.txt`.
 
 ## Roadmap
 
