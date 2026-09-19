@@ -37,6 +37,10 @@ jobs:
           python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/documentary-basic.json
           python tools/ai_edit/update_p5_ai_edit.py validate ai-edit/examples/chatgpt-portable.json
 
+      - name: Validate JSON examples
+        run: |
+          find examples ai-edit/examples -type f -name '*.json' -print0 | xargs -0 -n1 python -m json.tool >/dev/null
+
       - name: Validate capability registry CLI
         shell: bash
         run: |
@@ -51,7 +55,7 @@ jobs:
 
       - name: Validate creator pipeline dry run
         run: |
-          python tools/creator_pipeline/creator_pipeline.py             creator/examples/documentary-pipeline.json             --dry-run             --workdir /tmp/update-p5-pipeline
+          python tools/creator_pipeline/creator_pipeline.py             examples/creator/documentary-pipeline.json             --dry-run             --workdir /tmp/update-p5-pipeline
 
       - name: Validate Film Context tool catalog
         run: |
