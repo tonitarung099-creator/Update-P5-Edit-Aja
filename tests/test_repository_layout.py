@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 ALLOWED_ROOT_MARKDOWN = {
+    "AGENTS.md",
     "README.md",
     "BUILDING.md",
     "ROADMAP.md",
