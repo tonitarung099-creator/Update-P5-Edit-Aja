@@ -34,6 +34,12 @@ class RepositoryLayoutTests(unittest.TestCase):
         self.assertTrue((feature_docs / "LOCAL_EDIT_AGENT.md").is_file())
         self.assertTrue((feature_docs / "FILM_CONTEXT.md").is_file())
 
+    def test_examples_are_centralized(self):
+        examples = ROOT / "examples"
+        for name in ("caption", "creator", "dialogue", "documentary", "segmentation"):
+            self.assertTrue((examples / name).is_dir(), name)
+            self.assertFalse((ROOT / name).exists(), f"{name}/ should live below examples/")
+
     def test_workflow_surface_stays_small(self):
         workflow_dir = ROOT / ".github" / "workflows"
         yaml_files = {
