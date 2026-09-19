@@ -1,11 +1,11 @@
 import base64
 import bz2
 import hashlib
-import pathlib
 import unittest
 
+from tests.build_contract import ROOT, apply_entry, patch_entry, payload_entry
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+
 PATCH = ROOT / "patches" / "phase15-film-context-native.patch.bz2.b64"
 EXPECTED_SHA256 = "a8dc28c9e679d65d0551f997515ee0603983e373d1ab545def8d7fd5593e217a"
 
@@ -51,13 +51,24 @@ class FilmContextNativePatchTests(unittest.TestCase):
 
     def test_windows_build_contract(self):
         workflow = (ROOT / ".github" / "workflows" / "build-windows.yml").read_text(encoding="utf-8")
-        self.assertIn("PHASE15_SHA256", workflow)
-        self.assertIn("phase15-film-context-native.patch.bz2.b64", workflow)
-        self.assertIn("craft/editaja/phase15.patch", workflow)
-        self.assertIn("tools/film_context/film_context.py craft/editaja/film_context.txt", workflow)
-        self.assertIn("corresponding-source/data/scripts/filmcontext/film_context.py", workflow)
+        verifier = (ROOT / "scripts" / "verify_p5_source.py").read_text(encoding="utf-8")
+        reconstruct = (ROOT / "scripts" / "windows" / "reconstruct-source.ps1").read_text(encoding="utf-8")
+        gettext_patcher = (ROOT / "scripts" / "patch_gettext_blueprint.py").read_text(encoding="utf-8")
+
+        patch = patch_entry("phase15")
+        apply = apply_entry("phase15")
+        payload = payload_entry("tools/film_context/film_context.py")
+
+        self.assertEqual(patch["sha256"], EXPECTED_SHA256)
+        self.assertEqual(patch["sources"], ["patches/phase15-film-context-native.patch.bz2.b64"])
+        self.assertEqual(patch["output"], "craft/editaja/phase15.patch")
+        self.assertEqual(apply["strip"], 1)
+        self.assertEqual(payload["destination"], "craft/editaja/film_context.txt")
+        self.assertIn("film_context.py", reconstruct)
+        self.assertIn("movie_search", verifier)
+        self.assertIn("Build Visual Index", verifier)
         self.assertIn("Patch Craft gettext MinGW libxml2 linking", workflow)
-        self.assertIn("LIBS=-lxml2", workflow)
+        self.assertIn("LIBS=-lxml2", gettext_patcher)
 
     def test_ai_edit_json_stays_separate(self):
         docs = (ROOT / "FILM_CONTEXT.md").read_text(encoding="utf-8")
