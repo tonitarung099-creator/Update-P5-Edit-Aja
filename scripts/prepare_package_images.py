@@ -48,9 +48,19 @@ def create_windows_junction(source: Path, destination: Path) -> None:
 
 
 def prepare(craft_root: Path, package_name: str) -> int:
+    craft_root = craft_root.resolve()
     craft_bin = craft_root / "craft" / "bin"
     if not craft_bin.is_dir():
         raise RuntimeError(f"Craft bin directory not found: {craft_bin}")
+    settings = craft_root / "etc" / "CraftSettings.ini"
+    if not settings.is_file():
+        raise RuntimeError(f"Craft settings not found: {settings}")
+    if not (craft_bin.parent / "craftenv.ps1").is_file():
+        raise RuntimeError(f"Craft environment entry point not found: {craft_bin.parent}")
+    # CraftConfig locates itself via `craftRoot` (the Craft checkout) or
+    # sys.argv[0]. CRAFT_ROOT and KDEROOT do not control this lookup. This
+    # script lives outside Craft, so set its supported locator before imports.
+    os.environ["craftRoot"] = str(craft_bin.parent)
     sys.path.insert(0, str(craft_bin))
 
     from Blueprints.CraftDependencyPackage import CraftDependencyPackage, DependencyType

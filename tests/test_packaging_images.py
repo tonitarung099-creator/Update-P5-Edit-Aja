@@ -72,6 +72,12 @@ class PackagingPreflightTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         (self.root / "craft/bin").mkdir(parents=True)
+        (self.root / "craft/craftenv.ps1").touch()
+        (self.root / "etc").mkdir()
+        (self.root / "etc/CraftSettings.ini").touch()
+        env_patch = patch.dict(os.environ, {})
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
         self.dependencies = []
         self.ignored = ["libs/llvm"]
         self.owner = SimpleNamespace(ignoredPackages=self.ignored)
