@@ -71,7 +71,7 @@ class FilmContextNativePatchTests(unittest.TestCase):
         self.assertIn("LIBS=-lxml2", gettext_patcher)
 
     def test_ai_edit_json_stays_separate(self):
-        docs = (ROOT / "FILM_CONTEXT.md").read_text(encoding="utf-8")
+        docs = (ROOT / "docs" / "features" / "FILM_CONTEXT.md").read_text(encoding="utf-8")
         self.assertIn("Film Context itself never edits the timeline", docs)
         self.assertIn("AI Edit JSON", docs)
 
