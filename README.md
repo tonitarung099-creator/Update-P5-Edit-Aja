@@ -77,7 +77,7 @@ semua snapshpt zom 100 ke 111 5 dtk
 
 The local path performs typo normalization, timeline-context resolution, confidence checks and deterministic animation math. Complex semantic requests are routed to the existing API AI agent; external research/actions can be routed to MCP; specialized local work can be routed to whisper.cpp, DeepFilterNet, Demucs, SAM 2 and the other installed engines.
 
-For the snapshot zoom example, 100% to 111% over 5 seconds means a 4.5-second snapshot ends at 109.9%; clips longer than 5 seconds reach 111% at 5 seconds and then hold. See `LOCAL_EDIT_AGENT.md`.
+For the snapshot zoom example, 100% to 111% over 5 seconds means a 4.5-second snapshot ends at 109.9%; clips longer than 5 seconds reach 111% at 5 seconds and then hold. See `docs/features/LOCAL_EDIT_AGENT.md`.
 
 Phase 12 also adds a native **Local Edit** command bar in the Creator Workspace / AI Assistant. Deterministic commands inspect the live timeline and execute through the same native registry. Smooth snapshot zoom uses the editable `kdenlive_set_transform_keyframes` tool rather than cutting an image into fake animation segments. Complex commands are handed off to the existing API/MCP path without being sent automatically.
 
@@ -88,7 +88,7 @@ Film Context is an optional **local movie retrieval layer** for AI agents. It do
 
 The base index uses FFmpeg/FFprobe, SQLite, scene timestamps and optional SRT dialogue. Search results are deliberately compact. Neighbor context and JPEG keyframes are fetched only when requested, so an agent can escalate from text metadata to a few candidate images instead of sending the full film.
 
-Stable tool names are: `movie_context_status`, `movie_search`, `movie_get_scene`, `movie_get_context`, and `movie_get_keyframes`. The existing AI Assistant gets an optional Film Context section that is disabled by default; when enabled, it can build/select an index and use these tools without changing the ChatGPT/AI Edit JSON path. An additional OpenCLIP backend can optionally tag one representative frame per scene once and cache bilingual visual tags; OpenCLIP/PyTorch are not required by the base editor. See `FILM_CONTEXT.md`.
+Stable tool names are: `movie_context_status`, `movie_search`, `movie_get_scene`, `movie_get_context`, and `movie_get_keyframes`. The existing AI Assistant gets an optional Film Context section that is disabled by default; when enabled, it can build/select an index and use these tools without changing the ChatGPT/AI Edit JSON path. An additional OpenCLIP backend can optionally tag one representative frame per scene once and cache bilingual visual tags; OpenCLIP/PyTorch are not required by the base editor. See `docs/features/FILM_CONTEXT.md`.
 
 ## New intelligence engines
 
@@ -103,6 +103,10 @@ Update P5 now includes feature engines outside the original Phase 5 AI Agent:
 - **Optional local backends** — whisper.cpp transcription and DeepFilterNet voice cleanup, kept outside the base install.
 
 These engines intentionally feed the same Phase 6 AI Edit/native tool layer rather than introducing another AI agent.
+
+## Documentation
+
+Feature documentation is indexed in `docs/features/README.md`. Build and debugging instructions live in `BUILDING.md`.
 
 ## Roadmap
 
