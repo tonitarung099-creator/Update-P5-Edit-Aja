@@ -154,8 +154,463 @@ jobs:
           $text = Get-Content $cfg -Raw
           $text = [regex]::Replace($text, '(?m)^ABI\s*=.*$', 'ABI = windows-gcc-x86_64')
           $text = [regex]::Replace($text, '(?m)^MakeProgram\s*=.*$', 'MakeProgram = mingw32-make')
+          # Craft source builds on Windows require a short-path drive mapping.
+          # Configure it explicitly before any dependency source is unpacked.
+          if ($text -match '(?m)^\[ShortPath\]\s*
+
+      - name: Patch Craft gettext MinGW libxml2 linking
+        shell: pwsh
+        run: |
+          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
+          if (-not (Test-Path $gettextBlueprint)) {
+            throw "Craft gettext blueprint not found: $gettextBlueprint"
+          }
+
+          @'
+          from pathlib import Path
+
+          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
+          s = p.read_text(encoding="utf-8")
+          needle = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          replacement = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMinGW():\n'
+              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
+              '            # libgettextsrc link line can omit the import library.\n'
+              '            # LIBS is propagated by configure to the final libtool link.\n'
+              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          if needle not in s:
+              raise SystemExit("Could not locate gettext MinGW configure insertion point")
+          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
+          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
+
+          python patch_gettext_libxml2.py
+
+          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
+            throw 'gettext MinGW libxml2 hotfix verification failed'
+          }
+
+      - name: Install Update P5 Edit Aja Craft blueprint
+        shell: pwsh
+        run: |
+          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $blueprintRoot) {
+            throw 'Could not locate the KDE Craft blueprint root'
+          }
+          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item craft/editaja/* $target -Recurse -Force
+          Write-Host "Update P5 Edit Aja blueprint: $target"
+          Get-ChildItem $target
+
+      - name: Build Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Package Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Collect Windows package
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          if (Test-Path "$env:CRAFT_ROOT\tmp") {
+            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.Extension -in '.exe','.zip','.7z' -and
+                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
+              }
+            foreach ($p in $packages) {
+              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
+            }
+          }
+          Get-ChildItem artifacts -File | Format-Table Name, Length
+
+      - name: Upload Update P5 Edit Aja artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Update-P5-Edit-Aja-Windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+) {
+            if ($text -match '(?m)^DriveLetter\s*=') {
+              $text = [regex]::Replace($text, '(?m)^DriveLetter\s*=.*
+
+      - name: Patch Craft gettext MinGW libxml2 linking
+        shell: pwsh
+        run: |
+          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
+          if (-not (Test-Path $gettextBlueprint)) {
+            throw "Craft gettext blueprint not found: $gettextBlueprint"
+          }
+
+          @'
+          from pathlib import Path
+
+          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
+          s = p.read_text(encoding="utf-8")
+          needle = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          replacement = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMinGW():\n'
+              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
+              '            # libgettextsrc link line can omit the import library.\n'
+              '            # LIBS is propagated by configure to the final libtool link.\n'
+              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          if needle not in s:
+              raise SystemExit("Could not locate gettext MinGW configure insertion point")
+          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
+          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
+
+          python patch_gettext_libxml2.py
+
+          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
+            throw 'gettext MinGW libxml2 hotfix verification failed'
+          }
+
+      - name: Install Update P5 Edit Aja Craft blueprint
+        shell: pwsh
+        run: |
+          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $blueprintRoot) {
+            throw 'Could not locate the KDE Craft blueprint root'
+          }
+          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item craft/editaja/* $target -Recurse -Force
+          Write-Host "Update P5 Edit Aja blueprint: $target"
+          Get-ChildItem $target
+
+      - name: Build Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Package Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Collect Windows package
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          if (Test-Path "$env:CRAFT_ROOT\tmp") {
+            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.Extension -in '.exe','.zip','.7z' -and
+                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
+              }
+            foreach ($p in $packages) {
+              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
+            }
+          }
+          Get-ChildItem artifacts -File | Format-Table Name, Length
+
+      - name: Upload Update P5 Edit Aja artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Update-P5-Edit-Aja-Windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+, 'DriveLetter = Q')
+            } else {
+              $text = [regex]::Replace($text, '(?m)^\[ShortPath\]\s*
+
+      - name: Patch Craft gettext MinGW libxml2 linking
+        shell: pwsh
+        run: |
+          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
+          if (-not (Test-Path $gettextBlueprint)) {
+            throw "Craft gettext blueprint not found: $gettextBlueprint"
+          }
+
+          @'
+          from pathlib import Path
+
+          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
+          s = p.read_text(encoding="utf-8")
+          needle = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          replacement = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMinGW():\n'
+              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
+              '            # libgettextsrc link line can omit the import library.\n'
+              '            # LIBS is propagated by configure to the final libtool link.\n'
+              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          if needle not in s:
+              raise SystemExit("Could not locate gettext MinGW configure insertion point")
+          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
+          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
+
+          python patch_gettext_libxml2.py
+
+          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
+            throw 'gettext MinGW libxml2 hotfix verification failed'
+          }
+
+      - name: Install Update P5 Edit Aja Craft blueprint
+        shell: pwsh
+        run: |
+          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $blueprintRoot) {
+            throw 'Could not locate the KDE Craft blueprint root'
+          }
+          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item craft/editaja/* $target -Recurse -Force
+          Write-Host "Update P5 Edit Aja blueprint: $target"
+          Get-ChildItem $target
+
+      - name: Build Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Package Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Collect Windows package
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          if (Test-Path "$env:CRAFT_ROOT\tmp") {
+            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.Extension -in '.exe','.zip','.7z' -and
+                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
+              }
+            foreach ($p in $packages) {
+              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
+            }
+          }
+          Get-ChildItem artifacts -File | Format-Table Name, Length
+
+      - name: Upload Update P5 Edit Aja artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Update-P5-Edit-Aja-Windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+, "[ShortPath]`r`nDriveLetter = Q")
+            }
+          } else {
+            $text += "`r`n[ShortPath]`r`nDriveLetter = Q`r`n"
+          }
           Set-Content -Path $cfg -Value $text -Encoding UTF8
-          Get-Content $cfg | Select-String 'ABI|MakeProgram'
+          $verify = Get-Content $cfg -Raw
+          if ($verify -notmatch '(?ms)^\[ShortPath\].*?^DriveLetter\s*=\s*Q\s*
+
+      - name: Patch Craft gettext MinGW libxml2 linking
+        shell: pwsh
+        run: |
+          $gettextBlueprint = Join-Path $env:CRAFT_ROOT 'craft\blueprints\libs\gettext\gettext.py'
+          if (-not (Test-Path $gettextBlueprint)) {
+            throw "Craft gettext blueprint not found: $gettextBlueprint"
+          }
+
+          @'
+          from pathlib import Path
+
+          p = Path(r"C:\CraftRoot\craft\blueprints\libs\gettext\gettext.py")
+          s = p.read_text(encoding="utf-8")
+          needle = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          replacement = (
+              '            "gl_cv_libxml_use_included=no",\n'
+              '        ]\n\n'
+              '        if CraftCore.compiler.isMinGW():\n'
+              '            # gettext 0.22.3 detects external libxml2 headers but its\n'
+              '            # libgettextsrc link line can omit the import library.\n'
+              '            # LIBS is propagated by configure to the final libtool link.\n'
+              '            self.subinfo.options.configure.args += ["LIBS=-lxml2"]\n\n'
+              '        if CraftCore.compiler.isMSVC():'
+          )
+          if needle not in s:
+              raise SystemExit("Could not locate gettext MinGW configure insertion point")
+          p.write_text(s.replace(needle, replacement, 1), encoding="utf-8")
+          '@ | Set-Content -Path patch_gettext_libxml2.py -Encoding UTF8
+
+          python patch_gettext_libxml2.py
+
+          if (-not (Select-String -Path $gettextBlueprint -Pattern 'LIBS=-lxml2' -Quiet)) {
+            throw 'gettext MinGW libxml2 hotfix verification failed'
+          }
+
+      - name: Install Update P5 Edit Aja Craft blueprint
+        shell: pwsh
+        run: |
+          $blueprintRoot = Get-ChildItem "$env:CRAFT_ROOT\etc\blueprints\locations" -Directory -Filter craft-blueprints-kde -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $blueprintRoot) {
+            throw 'Could not locate the KDE Craft blueprint root'
+          }
+          $target = Join-Path $blueprintRoot.FullName 'kde\kdemultimedia\editaja'
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item craft/editaja/* $target -Recurse -Force
+          Write-Host "Update P5 Edit Aja blueprint: $target"
+          Get-ChildItem $target
+
+      - name: Build Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Package Update P5 Edit Aja
+        shell: pwsh
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and
+            $_ -notmatch '(?i)\\Git\\bin$' -and
+            $_ -notmatch '(?i)\\Git\\usr\\bin$' -and
+            $_ -notmatch '(?i)\\mingw64\\bin$' -and
+            $_ -notmatch '(?i)\\Strawberry\\c\\bin$'
+          }) -join ';'
+          python "$env:CRAFT_ROOT\craft\bin\craft.py" --ci-mode --package kde/kdemultimedia/editaja
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Collect Windows package
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          if (Test-Path "$env:CRAFT_ROOT\tmp") {
+            $packages = Get-ChildItem "$env:CRAFT_ROOT\tmp" -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.Extension -in '.exe','.zip','.7z' -and
+                ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
+              }
+            foreach ($p in $packages) {
+              Copy-Item $p.FullName (Join-Path 'artifacts' $p.Name) -Force
+            }
+          }
+          Get-ChildItem artifacts -File | Format-Table Name, Length
+
+      - name: Upload Update P5 Edit Aja artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Update-P5-Edit-Aja-Windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+) {
+            throw 'Craft ShortPath DriveLetter configuration failed'
+          }
+          Get-Content $cfg | Select-String 'ABI|MakeProgram|ShortPath|DriveLetter'
 
       - name: Patch Craft gettext MinGW libxml2 linking
         shell: pwsh
