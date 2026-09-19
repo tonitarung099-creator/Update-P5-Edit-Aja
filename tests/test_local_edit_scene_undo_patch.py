@@ -7,7 +7,7 @@ from tests.build_contract import ROOT, apply_entry, patch_entry
 
 
 PATCH_FILE = ROOT / "patches" / "phase13-local-edit-scene-undo.patch.bz2.b64"
-EXPECTED_SHA256 = "9826b9ec0a5252827cb34b8aa4f4b904a6bcf83c4ec302ad0e6893dd1bc195bc"
+EXPECTED_SHA256 = "a553eb5f1213e055a95bd8653039e978e6ba950db2ff627e7b471aa176e9f39b"
 
 
 class LocalEditSceneUndoPatchTests(unittest.TestCase):
@@ -38,6 +38,16 @@ class LocalEditSceneUndoPatchTests(unittest.TestCase):
     def test_multi_snapshot_is_one_undo_macro(self):
         self.assertIn('beginMacro(i18n("Local Edit: Zoom snapshots"))', self.patch)
         self.assertGreaterEqual(self.patch.count("endMacro()"), 2)
+
+    def test_detected_scene_remove_ranges_initializer_is_balanced(self):
+        self.assertIn(
+            '{QStringLiteral("end_frame"), endFrame}}}},',
+            self.patch,
+        )
+        self.assertNotIn(
+            '{QStringLiteral("end_frame"), endFrame}}}}},',
+            self.patch,
+        )
 
     def test_build_chain_contains_phase13(self):
         blueprint = (ROOT / "craft" / "editaja" / "editaja.py").read_text(encoding="utf-8")
