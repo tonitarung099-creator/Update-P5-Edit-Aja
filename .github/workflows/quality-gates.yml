@@ -57,6 +57,7 @@ jobs:
               tests.test_local_edit_native_patch
               tests.test_local_edit_scene_undo_patch
               tests.test_local_edit_preview_history_patch
+              tests.test_keyframe_api_compile_fix
               tests.test_phase_integration
               tests.test_workflow_presets
 
