@@ -150,3 +150,25 @@ mode. The smoke test now reads that installer-owned value after installation
 instead of guessing the final path. Build #63 therefore provides no evidence of
 an application startup failure; executable probing and GUI startup remained
 NOT TESTED in that run.
+
+
+## Build #64: packaged application startup verified
+
+Build #64 (`35492522303`, main `3641fe737...`) passed the complete Windows
+build path and the packaged-app startup smoke. The generated NSIS installer
+installed in CurrentUser mode, registered the final install root, exposed the
+packaged `bin/kdenlive.exe`, returned `kdenlive 26.11.70` from `--version`,
+remained alive for the 15-second GUI startup probe, and uninstalled cleanly.
+
+Startup proof is still not editing proof. The next Windows verification layer
+is `functional-smoke-package.ps1`. It installs the same packaged application,
+opens a copied Kdenlive test project from the verified corresponding source,
+waits for the live localhost agent/REST bridge, validates the native tool
+catalog, reads the active project and timeline, performs a native clip split,
+adds and reads back a subtitle, and saves a project copy. Each state change is
+read back through the running application's native registry before the step can
+pass.
+
+Render/export is intentionally kept out of this first functional smoke. It will
+be a separate verification boundary so a render failure cannot be confused with
+project loading, native timeline editing, subtitle editing, or project saving.

@@ -96,6 +96,10 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/smoke-test-package.ps1
 
+      - name: Functional smoke test packaged editor
+        shell: pwsh
+        run: ./scripts/windows/functional-smoke-package.ps1
+
       - name: Upload verified corresponding source
         if: ${{ always() && steps.corresponding_source.outcome == 'success' }}
         uses: actions/upload-artifact@v4

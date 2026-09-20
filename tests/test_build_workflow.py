@@ -78,6 +78,29 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         self.assertIn("Start-Sleep -Seconds 15", script)
         self.assertIn("'uninstall.exe'", script)
 
+    def test_functional_editor_smoke_runs_after_startup_smoke(self):
+        names = [step["name"] for step in self.windows["steps"]]
+        startup = names.index("Smoke test packaged Windows installer and app")
+        functional = names.index("Functional smoke test packaged editor")
+        source = names.index("Upload verified corresponding source")
+        self.assertLess(startup, functional)
+        self.assertLess(functional, source)
+
+    def test_functional_editor_smoke_uses_live_native_registry(self):
+        script = (ROOT / "scripts/windows/functional-smoke-package.ps1").read_text()
+        for token in (
+            "kdenlive-open-agent.json",
+            "kdenlive_get_project_info",
+            "kdenlive_get_timeline_state",
+            "kdenlive_cut_clip",
+            "kdenlive_add_subtitle",
+            "kdenlive_list_subtitles",
+            "kdenlive_save_project",
+            "corresponding-source/tests/dataset/av.kdenlive",
+            "FUNCTIONAL EDITOR SMOKE PASS",
+        ):
+            self.assertIn(token, script)
+
     def test_build_uses_the_commit_that_passed_quality_gates(self):
         checkout = self.windows["steps"][0]
         self.assertTrue(checkout["uses"].startswith("actions/checkout@"))
