@@ -122,13 +122,31 @@ the `Update-P5-Edit-Aja-Windows-x64` artifact.
 
 Packaging success is not runtime proof. The build workflow therefore runs
 `smoke-test-package.ps1` after the Windows artifact has been collected and
-uploaded. The smoke test installs the NSIS package silently in CurrentUser mode
-to an isolated runner directory, verifies `bin/kdenlive.exe` and the
-uninstaller, runs the packaged executable with `--version`, launches the GUI
-process for 15 seconds to reject immediate startup crashes, then stops the
-process and uninstalls the test copy.
+uploaded. The smoke test installs the NSIS package silently in CurrentUser mode,
+requests an isolated runner directory, then reads Craft/NSIS's registered
+`Install_Dir` as the authoritative final install location. It verifies
+`bin/kdenlive.exe` and the uninstaller there, runs the packaged executable with
+`--version`, launches the GUI process for 15 seconds to reject immediate
+startup crashes, then stops the process and uninstalls the test copy.
 
 This proves installer execution, packaged runtime loading, and basic startup on
 the Windows runner. It still does not prove project editing, media import,
 timeline operations, render/export, optional AI backends, Windows 11 hardware
 compatibility, or release readiness; those remain separate verification stages.
+
+
+### Build #63: smoke test reached installer execution
+
+Build #63 (`35489590662`, main `adb9b27d...`) again passed source
+reconstruction, dependencies, Windows compile, packaging, package collection,
+and Windows artifact upload. The new runtime smoke step launched the generated
+NSIS installer successfully, but then failed before executing the application
+because the first smoke implementation assumed the requested `/D=` path was
+also the final MultiUser install directory.
+
+The pinned Craft NSIS template writes its final installation directory to
+`HKCU\Software\KDE e.V.\Update P5 Edit Aja\Install_Dir` in CurrentUser
+mode. The smoke test now reads that installer-owned value after installation
+instead of guessing the final path. Build #63 therefore provides no evidence of
+an application startup failure; executable probing and GUI startup remained
+NOT TESTED in that run.

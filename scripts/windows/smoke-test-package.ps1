@@ -19,16 +19,18 @@ if ($installers.Count -eq 0) {
 # Craft can emit companion package files. Prefer the largest matching EXE,
 # which is the NSIS installer containing the application payload.
 $installer = $installers[0]
-$installRoot = Join-Path $env:RUNNER_TEMP 'editaja-packaged-app-smoke'
+$requestedInstallRoot = Join-Path $env:RUNNER_TEMP 'editaja-packaged-app-smoke'
+$installRegistryPath = 'HKCU:\Software\KDE e.V.\Update P5 Edit Aja'
 $stdout = Join-Path $env:RUNNER_TEMP 'editaja-version-stdout.txt'
 $stderr = Join-Path $env:RUNNER_TEMP 'editaja-version-stderr.txt'
 
-if (Test-Path $installRoot) {
-    Remove-Item $installRoot -Recurse -Force
+if (Test-Path $requestedInstallRoot) {
+    Remove-Item $requestedInstallRoot -Recurse -Force
 }
 Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
 
 $appProcess = $null
+$installedRoot = $null
 
 function Stop-SmokeProcessTree {
     param([System.Diagnostics.Process]$Process)
@@ -41,29 +43,52 @@ function Stop-SmokeProcessTree {
     & taskkill.exe /PID $Process.Id /T /F | Out-Host
 }
 
+function Resolve-InstalledRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RegistryPath
+    )
+
+    if (-not (Test-Path -LiteralPath $RegistryPath)) {
+        throw "Installer completed but its CurrentUser registry key was not created: $RegistryPath"
+    }
+
+    $properties = Get-ItemProperty -LiteralPath $RegistryPath
+    $root = "$($properties.Install_Dir)".Trim()
+    if (-not $root) {
+        throw "Installer registry key exists but Install_Dir is empty: $RegistryPath"
+    }
+
+    return $root
+}
+
 try {
     Write-Host "Smoke installer: $($installer.FullName)"
-    Write-Host "Smoke install root: $installRoot"
+    Write-Host "Requested smoke install root: $requestedInstallRoot"
 
     # The pinned Craft NSIS template enables MULTIUSER_INSTALLMODE_COMMANDLINE.
     # /CurrentUser avoids an elevation requirement in the hosted runner.
-    # NSIS requires /D= to be the final argument and the path is intentionally
-    # chosen without spaces so Start-Process cannot change its parsing.
-    $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', '/CurrentUser', "/D=$installRoot") -PassThru -Wait
+    # MultiUser initialization owns the final $INSTDIR, so after installation
+    # the smoke test reads Craft's authoritative Install_Dir registry value
+    # instead of assuming the requested /D path survived initialization.
+    $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', '/CurrentUser', "/D=$requestedInstallRoot") -PassThru -Wait
     if ($install.ExitCode -ne 0) {
         throw "Silent installer exited with code $($install.ExitCode)."
     }
 
-    $app = Join-Path $installRoot 'bin/kdenlive.exe'
-    $uninstaller = Join-Path $installRoot 'uninstall.exe'
+    $installedRoot = Resolve-InstalledRoot -RegistryPath $installRegistryPath
+    Write-Host "Registered install root: $installedRoot"
+
+    $app = Join-Path $installedRoot 'bin/kdenlive.exe'
+    $uninstaller = Join-Path $installedRoot 'uninstall.exe'
     if (-not (Test-Path $app -PathType Leaf)) {
-        throw "Installed application executable not found: $app"
+        throw "Installed application executable not found at registered install root: $app"
     }
     if (-not (Test-Path $uninstaller -PathType Leaf)) {
-        throw "Installed uninstaller not found: $uninstaller"
+        throw "Installed uninstaller not found at registered install root: $uninstaller"
     }
 
-    Write-Host 'Installer PASS: packaged application files are present.'
+    Write-Host 'Installer PASS: packaged application files are present at the registered install root.'
 
     # --version initializes the packaged executable and its DLL search path, but
     # exits without requiring GUI interaction. Missing runtime DLLs surface here
@@ -97,16 +122,20 @@ try {
 finally {
     Stop-SmokeProcessTree -Process $appProcess
 
-    $uninstaller = Join-Path $installRoot 'uninstall.exe'
-    if (Test-Path $uninstaller -PathType Leaf) {
-        Write-Host 'Running silent smoke-test uninstall.'
-        $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @('/S', "_?=$installRoot") -PassThru -Wait
-        if ($uninstall.ExitCode -ne 0) {
-            Write-Warning "Smoke-test uninstaller exited with code $($uninstall.ExitCode)."
+    if ($installedRoot) {
+        $uninstaller = Join-Path $installedRoot 'uninstall.exe'
+        if (Test-Path $uninstaller -PathType Leaf) {
+            Write-Host "Running silent smoke-test uninstall from: $installedRoot"
+            $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @('/S', "_?=$installedRoot") -PassThru -Wait
+            if ($uninstall.ExitCode -ne 0) {
+                Write-Warning "Smoke-test uninstaller exited with code $($uninstall.ExitCode)."
+            }
         }
     }
 
-    if (Test-Path $installRoot) {
-        Remove-Item $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+    foreach ($root in @($installedRoot, $requestedInstallRoot)) {
+        if ($root -and (Test-Path $root)) {
+            Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }

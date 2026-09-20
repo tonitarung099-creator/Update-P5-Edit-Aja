@@ -69,7 +69,10 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
     def test_packaged_app_smoke_installs_probes_starts_and_uninstalls(self):
         script = (ROOT / "scripts/windows/smoke-test-package.ps1").read_text()
         self.assertIn("'/S', '/CurrentUser'", script)
-        self.assertIn('"/D=$installRoot"', script)
+        self.assertIn('"/D=$requestedInstallRoot"', script)
+        self.assertIn("'HKCU:\\Software\\KDE e.V.\\Update P5 Edit Aja'", script)
+        self.assertIn("Resolve-InstalledRoot", script)
+        self.assertIn("Install_Dir", script)
         self.assertIn("'bin/kdenlive.exe'", script)
         self.assertIn("@('--version')", script)
         self.assertIn("Start-Sleep -Seconds 15", script)
