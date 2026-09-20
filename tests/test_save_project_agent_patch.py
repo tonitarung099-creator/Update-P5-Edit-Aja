@@ -32,13 +32,16 @@ class NativeSaveProjectPatchTests(unittest.TestCase):
             added,
         )
 
-    def test_save_fix_is_last_source_patch(self):
-        entry = self.manifest["apply_chain"][-1]
-        self.assertEqual(entry["name"], "save-project-agent")
+    def test_save_fix_precedes_ui_sidebar_patch(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        save_index = names.index("save-project-agent")
+        ui_index = names.index("ai-agent-sidebar")
+        self.assertLess(save_index, ui_index)
+        entry = self.manifest["apply_chain"][save_index]
         self.assertEqual(entry["path"], "patches/save-project-agent.patch")
         self.assertTrue(entry["check"])
 
-    def test_save_fix_is_copied_into_blueprint_and_applied_last(self):
+    def test_save_fix_is_copied_into_blueprint_before_ui_patch(self):
         payloads = {
             item["source"]: item["destination"]
             for item in self.manifest["blueprint_payloads"]
@@ -48,7 +51,12 @@ class NativeSaveProjectPatchTests(unittest.TestCase):
             "craft/editaja/save-project-agent.patch",
         )
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("save-project-agent.patch", 1)]'))
+        self.assertIn('("save-project-agent.patch", 1)', chain)
+        self.assertIn('("ai-agent-sidebar.patch", 1)', chain)
+        self.assertLess(
+            chain.index('("save-project-agent.patch", 1)'),
+            chain.index('("ai-agent-sidebar.patch", 1)'),
+        )
 
 
 if __name__ == "__main__":
