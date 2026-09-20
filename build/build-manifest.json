@@ -123,6 +123,12 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "save-project-agent",
+      "path": "patches/save-project-agent.patch",
+      "strip": 1,
+      "check": true
     }
   ],
   "blueprint_payloads": [
@@ -149,6 +155,10 @@
     {
       "source": "patches/subtitle-initialization.patch",
       "destination": "craft/editaja/subtitle-initialization.patch"
+    },
+    {
+      "source": "patches/save-project-agent.patch",
+      "destination": "craft/editaja/save-project-agent.patch"
     }
   ]
 }
