@@ -101,6 +101,15 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         ):
             self.assertIn(token, script)
 
+    def test_dependency_install_retries_transient_network_failures(self):
+        script = (ROOT / "scripts/windows/invoke-craft.ps1").read_text()
+        install_block = script.split("'install-deps' {", 1)[1].split("'build' {", 1)[0]
+        self.assertIn("$maxAttempts = 3", install_block)
+        self.assertIn("Craft dependency attempt", script)
+        self.assertIn("$PSNativeCommandUseErrorActionPreference = $false", script)
+        self.assertIn("Start-Sleep -Seconds $delaySeconds", script)
+        self.assertIn("already-installed packages will be reused", script)
+
     def test_build_uses_the_commit_that_passed_quality_gates(self):
         checkout = self.windows["steps"][0]
         self.assertTrue(checkout["uses"].startswith("actions/checkout@"))
