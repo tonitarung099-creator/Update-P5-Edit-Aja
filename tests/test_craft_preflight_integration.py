@@ -1,7 +1,8 @@
 """Run the real preflight CLI against the manifest-pinned Craft checkout.
 
 P5_CRAFT_TEST_SOURCE must name a local checkout of that exact revision. The
-fixture has a source-only blueprint, so no toolchain download/build is needed.
+fixtures include source-only and prebuilt-binary blueprints; no toolchain
+download/build is needed.
 """
 
 import json
@@ -63,6 +64,67 @@ class CraftPreflightIntegrationTests(unittest.TestCase):
         # Match invocation after Enter-CraftEnvironment has already run.
         self.env["KDEROOT"] = str(self.root)
         self.env["CRAFT_ROOT"] = str(self.root)
+
+    def add_binary_dependency(self):
+        fixture = self.root / "etc/blueprints/locations/fixture"
+        probe = fixture / "probe/probe.py"
+        probe.write_text(probe.read_text().replace(
+            "    def setDependencies(self):\n        pass",
+            "    def setDependencies(self):\n        self.runtimeDependencies['dev-utils/snoretoast'] = None",
+        ), encoding="utf-8")
+        recipe = fixture / "dev-utils/snoretoast"
+        recipe.mkdir(parents=True)
+        (recipe / "snoretoast.py").write_text(
+            "import info\n"
+            "from CraftCore import CraftCore\n"
+            "from Package.BinaryPackageBase import BinaryPackageBase\n"
+            "class subinfo(info.infoclass):\n"
+            "    def setTargets(self):\n"
+            "        self.targets['0.7.0'] = ''\n"
+            "        self.defaultTarget = '0.7.0'\n"
+            "    def setDependencies(self):\n"
+            "        pass\n"
+            "class Package(BinaryPackageBase):\n"
+            "    def imageDir(self):\n"
+            "        return CraftCore.standardDirs.craftRoot() / 'fixture-images' / self.package.path / self.imageDirPattern()\n",
+            encoding="utf-8",
+        )
+        return self.root / "fixture-images/dev-utils/snoretoast"
+
+    def test_real_binary_dependency_missing_image_fails(self):
+        self.add_binary_dependency()
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("dev-utils/snoretoast", result.stderr)
+        self.assertIn("image-RelWithDebInfo-0.7.0", result.stderr)
+
+    def test_real_binary_dependency_existing_image_passes(self):
+        images = self.add_binary_dependency()
+        (images / "image-RelWithDebInfo-0.7.0").mkdir(parents=True)
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    @unittest.skipUnless(os.name == "nt", "Real Craft plus Windows junction")
+    def test_real_snoretoast_binary_fallback_preserves_payload_and_is_idempotent(self):
+        images = self.add_binary_dependency()
+        source = images / "image-MinSizeRel-0.7.0"
+        desired = images / "image-RelWithDebInfo-0.7.0"
+        (source / "bin").mkdir(parents=True)
+        payload = b"fixture payload, not an executable"
+        (source / "bin/snoretoast.exe").write_bytes(payload)
+        try:
+            first = self.run_helper()
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertIn("repaired 1 image path(s)", first.stdout)
+            self.assertEqual((desired / "bin/snoretoast.exe").read_bytes(), payload)
+            self.assertTrue(desired.samefile(source))
+            again = self.run_helper()
+            self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+            self.assertIn("repaired 0 image path(s)", again.stdout)
+        finally:
+            if desired.is_dir():
+                os.rmdir(desired)
+        self.assertEqual((source / "bin/snoretoast.exe").read_bytes(), payload)
 
     def run_helper(self, package="probe"):
         return subprocess.run(
