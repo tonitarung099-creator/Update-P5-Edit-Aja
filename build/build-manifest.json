@@ -112,6 +112,12 @@
       "ignore_space_change": true
     },
     {
+      "name": "subtitle-initialization",
+      "path": "patches/subtitle-initialization.patch",
+      "strip": 1,
+      "check": true
+    },
+    {
       "name": "keyframe-api-compile-fix",
       "path": "patches/keyframe-api-compile-fix.patch",
       "strip": 1,
@@ -139,6 +145,10 @@
     {
       "source": "scripts/apply_branding.py",
       "destination": "craft/editaja/apply_branding.txt"
+    },
+    {
+      "source": "patches/subtitle-initialization.patch",
+      "destination": "craft/editaja/subtitle-initialization.patch"
     }
   ]
 }

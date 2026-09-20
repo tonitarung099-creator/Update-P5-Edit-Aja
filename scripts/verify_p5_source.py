@@ -23,6 +23,17 @@ TEXT_CHECKS = [
     ("src/aiassistant/openaicompatibleagent.cpp", r"agent_image_paths", "Phase 15 multi-keyframe vision handoff"),
 ]
 
+
+# Creating subtitles must initialize the lazy model through the native UI path.
+# Match within each dispatch branch so another tool's initializer cannot pass.
+for tool in ("kdenlive_add_subtitle", "kdenlive_import_subtitles", "kdenlive_add_subtitle_batch"):
+    TEXT_CHECKS.append((
+        "src/mainwindow.cpp",
+        rf'if \(toolName == QLatin1String\("{tool}"\)\) \{{\s*'
+        r'//[^\n]*\n\s*showSubtitleTrack\(\);\s*const auto subtitles = model->getSubtitleModel\(\);',
+        f"Native subtitle initialization for {tool}",
+    ))
+
 REQUIRED_FILES = [
     ("src/aiassistant/aiassistantwidget.cpp", "Phase 5 AI assistant source"),
     ("data/scripts/filmcontext/film_context.py", "Phase 15 local Film Context backend"),

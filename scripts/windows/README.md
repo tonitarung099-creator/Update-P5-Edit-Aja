@@ -172,3 +172,21 @@ pass.
 Render/export is intentionally kept out of this first functional smoke. It will
 be a separate verification boundary so a render failure cannot be confused with
 project loading, native timeline editing, subtitle editing, or project saving.
+
+
+### Native subtitle initialization audit
+
+After Build #64 passed installer/startup smoke and Build #65 began functional
+verification, source inspection found that the three agent creation tools
+(`kdenlive_add_subtitle`, `kdenlive_import_subtitles`,
+`kdenlive_add_subtitle_batch`) read the lazy subtitle model without initializing
+it. Projects without subtitle tracks, including the `av.kdenlive` smoke fixture,
+can therefore return `Subtitle model is not available` before adding anything.
+The native UI calls `showSubtitleTrack()` before adding/importing subtitles.
+
+`patches/subtitle-initialization.patch` uses that same existing initialization
+path in the three creation branches. Existing edit, undo, validation, and
+read-only operations are preserved. Reconstruction verifies the initializer in
+each affected branch. The packaged functional smoke test must still prove that
+adding a subtitle to the subtitle-free fixture succeeds; Windows compile and
+functional verification of this change remain separate gates.
