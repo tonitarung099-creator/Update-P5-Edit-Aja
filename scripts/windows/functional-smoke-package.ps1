@@ -204,7 +204,9 @@ try {
         'kdenlive_cut_clip',
         'kdenlive_add_subtitle',
         'kdenlive_list_subtitles',
-        'kdenlive_save_project'
+        'kdenlive_save_project',
+        'kdenlive_list_panels',
+        'kdenlive_open_panel'
     )
     foreach ($required in $requiredTools) {
         if ($toolNames -notcontains $required) {
@@ -212,6 +214,19 @@ try {
         }
     }
     Write-Host "Native tool catalog PASS: $($requiredTools.Count) required tools are present."
+
+    $stage = 'ai_panel'
+    $panels = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_panels'
+    $panelNames = @($panels.panels | ForEach-Object { "$_" })
+    if ($panelNames -notcontains 'ai') {
+        throw "AI Agent panel is missing from the packaged editor panel catalog: $($panels | ConvertTo-Json -Depth 20 -Compress)"
+    }
+
+    $openedPanel = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_open_panel' -Arguments @{ panel_name = 'ai' }
+    if ("$($openedPanel.panel)" -ne 'ai') {
+        throw "AI Agent panel open verification returned an unexpected result: $($openedPanel | ConvertTo-Json -Depth 20 -Compress)"
+    }
+    Write-Host 'AI Agent panel PASS: registered and openable through the live packaged editor.'
 
     $stage = 'project_load'
     $project = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $projectPath
@@ -271,7 +286,7 @@ try {
 
     Write-Host "Project save-copy PASS: $savedProjectPath"
     $status = 'PASS'
-    Write-Host 'FUNCTIONAL EDITOR SMOKE PASS: REST/native registry, project load, timeline split, subtitle edit, and project save-copy.'
+    Write-Host 'FUNCTIONAL EDITOR SMOKE PASS: REST/native registry, AI Agent panel, project load, timeline split, subtitle edit, and project save-copy.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess

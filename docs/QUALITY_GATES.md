@@ -108,3 +108,11 @@ Windows regression in PR #33 reproduced that warning with a zero-byte stdout
 file and a discovery token. Diagnostic collection now uses `ReadAllText` to
 obtain an actual empty string before redaction. The regression checks that
 empty stdout does not prevent stderr redaction or the PASS/FAIL stage report.
+
+Build #72 (`35516728222`, source `a861b8796ee4ec27590488a792c281fdf1756694`)
+completed successfully after the AI Agent primary-right-sidebar change. Source
+reconstruction, MinGW compilation, NSIS packaging, installer startup smoke,
+functional editor smoke, diagnostics upload and corresponding-source upload all
+passed. The next functional-smoke contract also verifies that the packaged live
+tool registry exposes `kdenlive_list_panels` and `kdenlive_open_panel`, that
+the `ai` panel is registered, and that the packaged editor can open it.
