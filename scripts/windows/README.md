@@ -190,3 +190,20 @@ read-only operations are preserved. Reconstruction verifies the initializer in
 each affected branch. The packaged functional smoke test must still prove that
 adding a subtitle to the subtitle-free fixture succeeds; Windows compile and
 functional verification of this change remain separate gates.
+
+
+## Build #65: transient KDE dependency download failure
+
+Build #65 (`35497266457`, main `35a4e886...`) failed before compilation in
+`Install dependencies from KDE binary cache`. The first cache-manifest 404 was
+not terminal: Craft fell back and continued. The actual terminal failure was a
+network connection error while fetching dependencies. The log shows
+`wget2 ... failed with exit code 4` / `Failed to connect`, including the
+source fallback for `kde/applications/libkexiv2`.
+
+Dependency installation now retries the same Craft command up to three times
+with short increasing delays. Craft keeps successfully installed dependencies
+between attempts, so a retry resumes from the remaining package set instead of
+discarding completed work. Compile, package, and application-runtime commands
+are not retried by this rule; deterministic failures in those stages remain
+immediate failures.
