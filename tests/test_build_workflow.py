@@ -40,6 +40,18 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         self.assertEqual(queue["group"], "update-p5-edit-aja-windows")
         self.assertIs(queue["cancel-in-progress"], False)
 
+    def test_packaging_dependencies_are_checked_before_expensive_compile(self):
+        commands = [step.get("run", "") for step in self.windows["steps"]]
+        install = commands.index("./scripts/windows/invoke-craft.ps1 -Mode install-packager")
+        early = commands.index("./scripts/windows/prepare-package-images.ps1 -DependenciesOnly")
+        compile_app = commands.index("./scripts/windows/invoke-craft.ps1 -Mode build")
+        full = commands.index("./scripts/windows/prepare-package-images.ps1")
+        package = commands.index("./scripts/windows/invoke-craft.ps1 -Mode package")
+        self.assertLess(install, early)
+        self.assertLess(early, compile_app)
+        self.assertLess(compile_app, full)
+        self.assertLess(full, package)
+
     def test_build_uses_the_commit_that_passed_quality_gates(self):
         checkout = self.windows["steps"][0]
         self.assertTrue(checkout["uses"].startswith("actions/checkout@"))

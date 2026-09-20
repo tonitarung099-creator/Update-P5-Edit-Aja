@@ -89,19 +89,26 @@ class PackagingPreflightTests(unittest.TestCase):
         class SourceOnly:
             pass
 
+        class BinaryPackage:
+            pass
+
         self.source_only = SourceOnly
+        self.binary_package = BinaryPackage
         self.dep_type = DependencyType
         package_module = ModuleType("Blueprints.CraftPackageObject")
-        package_module.CraftPackageObject = SimpleNamespace(get=lambda name: SimpleNamespace(instance=self.owner))
+        package_module.CraftPackageObject = SimpleNamespace(get=lambda name: SimpleNamespace(path=name, instance=self.owner))
         dependency_module = ModuleType("Blueprints.CraftDependencyPackage")
         dependency_module.DependencyType = DependencyType
         dependency_module.CraftDependencyPackage = lambda package: SimpleNamespace(getDependencies=self.resolve)
         source_module = ModuleType("Package.SourceOnlyPackageBase")
         source_module.SourceOnlyPackageBase = SourceOnly
+        binary_module = ModuleType("Package.BinaryPackageBase")
+        binary_module.BinaryPackageBase = BinaryPackage
         modules = {
             "Blueprints.CraftPackageObject": package_module,
             "Blueprints.CraftDependencyPackage": dependency_module,
             "Package.SourceOnlyPackageBase": source_module,
+            "Package.BinaryPackageBase": binary_module,
         }
         self.modules = patch.dict(sys.modules, modules)
         self.modules.start()
@@ -115,7 +122,7 @@ class PackagingPreflightTests(unittest.TestCase):
         self.assertIs(ignoredPackages, self.ignored)
         return self.dependencies
 
-    def dependency(self, name, desired_exists=False, alternative="MinSizeRel"):
+    def dependency(self, name, desired_exists=False, alternative="MinSizeRel", binary=False):
         root = self.root / name
         root.mkdir(parents=True)
         desired = root / "image-RelWithDebInfo-14.2.0"
@@ -123,8 +130,33 @@ class PackagingPreflightTests(unittest.TestCase):
             desired.mkdir()
         if alternative:
             (root / f"image-{alternative}-14.2.0").mkdir()
-        self.dependencies.append(SimpleNamespace(path=name, instance=SimpleNamespace(imageDir=lambda: desired)))
+        instance = self.binary_package() if binary else SimpleNamespace()
+        instance.imageDir = lambda: desired
+        self.dependencies.append(SimpleNamespace(path=name, instance=instance))
         return desired
+
+    def test_prebuilt_snoretoast_can_reuse_same_version_release_image(self):
+        desired = self.dependency("dev-utils/snoretoast", binary=True)
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            self.assertEqual(prepare(self.root, "application"), 0)
+            junction.assert_called_once_with(desired.parent / "image-MinSizeRel-14.2.0", desired)
+
+    def test_source_built_snoretoast_is_not_aliased(self):
+        self.dependency("dev-utils/snoretoast")
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            with self.assertRaisesRegex(RuntimeError, "snoretoast"):
+                prepare(self.root, "application")
+            junction.assert_not_called()
+
+    def test_early_check_skips_only_application_image(self):
+        self.dependency("application", alternative=None)
+        self.dependency("dependency", alternative=None)
+        with self.assertRaisesRegex(RuntimeError, "dependency"):
+            prepare(self.root, "application", dependencies_only=True)
+        self.dependencies.pop()
+        self.assertEqual(prepare(self.root, "application", dependencies_only=True), 0)
+        with self.assertRaisesRegex(RuntimeError, "application"):
+            prepare(self.root, "application")
 
     def test_runtime_fallback_is_used_and_existing_images_untouched(self):
         desired = self.dependency("libs/runtime")

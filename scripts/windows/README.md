@@ -24,15 +24,18 @@ script responsible for that step. Avoid putting build logic back into
 
 ## Packaging image compatibility
 
-`prepare-package-images.ps1` runs immediately before Craft packaging. Craft's
+`prepare-package-images.ps1 -DependenciesOnly` checks dependency images before
+compilation. The full check runs again after compilation, immediately before
+Craft packaging, and also requires the application image. Craft's
 Windows bootstrap may install toolchain images as `MinSizeRel` while the
 application build uses `RelWithDebInfo`. The Craft packager requires an image
 directory for every runtime/packaging dependency. Build #51's log confirms
 `libs/runtime` installed the MinGW 14.2.0 DLLs in `image-MinSizeRel-14.2.0`,
 then packaging looked for `image-RelWithDebInfo-14.2.0`.
 
-The helper permits a temporary directory junction only for `libs/runtime`,
-using an exact same-target release image. Debug images, other versions, missing
+The helper permits a temporary directory junction for `libs/runtime` and the
+prebuilt MinGW `dev-utils/snoretoast` package, using an exact same-target release
+image. SnoreToast must be a `BinaryPackageBase`; a source-built recipe is rejected. Debug images, other versions, missing
 application images, and missing images of other dependencies fail explicitly.
 It checks all required images before creating any junction. Package exclusions
 are initialized in the blueprint constructor so preflight and Craft packaging
@@ -57,3 +60,27 @@ the manifest-pinned Craft checkout, with an isolated configuration and a small
 source-only blueprint. It checks external-script invocation, paths with spaces,
 a stale locator, and missing settings without downloading the application
 dependencies. This tests real Craft initialization, not a mocked configuration.
+
+## Build #60: prebuilt SnoreToast image
+
+Build #60 (`35456970019`) installed SnoreToast 0.7.0 from KDE's prebuilt
+MSVC archive during bootstrap. Its post-install log identifies
+`image-MinSizeRel-0.7.0`, while packaging requested
+`image-RelWithDebInfo-0.7.0`. The pinned Craft configuration fix worked;
+preflight stopped because the compatibility exception covered only MinGW's
+runtime libraries. No package or application smoke test completed.
+
+The MinGW SnoreToast blueprint copies one upstream binary archive for all
+release build types. Reusing that exact-version image preserves its payload;
+it does not change or recompile the executable. The guard still rejects Debug,
+other versions, unrelated dependencies, and source-built SnoreToast.
+
+The Windows integration test uses the actual pinned Craft dependency resolver,
+a BinaryPackageBase fixture, and a real junction. It verifies the fixture
+payload is readable, unchanged, and reusable on a second run. It does not claim
+to run the actual SnoreToast executable or the final application.
+
+Both the packager installation and dependency-image check now happen before
+compiling Edit Aja. The early check skips only the root application image; the
+mandatory post-compile check includes it. This catches missing packaging
+inputs before spending time on another full application compile.

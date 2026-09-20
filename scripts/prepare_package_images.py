@@ -47,7 +47,7 @@ def create_windows_junction(source: Path, destination: Path) -> None:
         )
 
 
-def prepare(craft_root: Path, package_name: str) -> int:
+def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = False) -> int:
     craft_root = craft_root.resolve()
     craft_bin = craft_root / "craft" / "bin"
     if not craft_bin.is_dir():
@@ -66,6 +66,7 @@ def prepare(craft_root: Path, package_name: str) -> int:
     from Blueprints.CraftDependencyPackage import CraftDependencyPackage, DependencyType
     from Blueprints.CraftPackageObject import CraftPackageObject
     from Package.SourceOnlyPackageBase import SourceOnlyPackageBase
+    from Package.BinaryPackageBase import BinaryPackageBase
 
     package = CraftPackageObject.get(package_name)
     if package is None:
@@ -80,6 +81,8 @@ def prepare(craft_root: Path, package_name: str) -> int:
     repairs = []
     missing = []
     for dependency in dependencies:
+        if dependencies_only and dependency.path == package.path:
+            continue
         instance = dependency.instance
         if isinstance(instance, SourceOnlyPackageBase):
             continue
@@ -88,12 +91,17 @@ def prepare(craft_root: Path, package_name: str) -> int:
         if desired.is_dir():
             continue
 
-        # Build #51 installed these unchanged MinGW runtime DLLs during
-        # bootstrap as MinSizeRel. Do not generalize this exception to Qt,
-        # other dependencies, or the application we must actually compile.
+        # Bootstrap installs the MinGW runtime and prebuilt SnoreToast under
+        # MinSizeRel (confirmed in Builds #51/#60). SnoreToast's MinGW recipe
+        # copies the same upstream binary archive for every release build type.
+        # Do not extend this exception to source-built Qt or the application.
+        compatible_package = dependency.path == "libs/runtime" or (
+            dependency.path == "dev-utils/snoretoast"
+            and isinstance(instance, BinaryPackageBase)
+        )
         candidates = (
             compatible_image_candidates(desired.parent, desired.name)
-            if dependency.path == "libs/runtime"
+            if compatible_package
             else []
         )
         if not candidates:
@@ -127,8 +135,10 @@ def main() -> int:
         default=Path(os.environ.get("CRAFT_ROOT", r"C:\CraftRoot")),
     )
     parser.add_argument("--package", default="kde/kdemultimedia/editaja")
+    parser.add_argument("--dependencies-only", action="store_true",
+                        help="Check dependencies before compiling; full packaging check must follow the build.")
     args = parser.parse_args()
-    return prepare(args.craft_root.resolve(), args.package)
+    return prepare(args.craft_root.resolve(), args.package, dependencies_only=args.dependencies_only)
 
 
 if __name__ == "__main__":
