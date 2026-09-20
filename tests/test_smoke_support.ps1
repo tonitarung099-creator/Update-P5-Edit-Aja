@@ -35,6 +35,15 @@ try {
         throw 'Diagnostics did not retain the failed stage and checked-out commit.'
     }
 
+    # A GUI application often produces no stdout. Exercise a genuinely empty
+    # redirected file with a live discovery token, as in the packaged smoke.
+    $emptyLog = Join-Path $root 'empty-stdout.txt'
+    [System.IO.File]::WriteAllBytes($emptyLog, [byte[]]@())
+    $emptyDestination = Join-Path $root 'empty-output'
+    Export-SmokeDiagnostics -Directory $emptyDestination -Stage 'save_copy' -Status 'PASS' -LogPaths @($emptyLog, $log) -DiscoveryFile $discovery
+    if (-not (Test-Path (Join-Path $emptyDestination 'result.json'))) { throw 'An empty log lost the stage report.' }
+    if (-not (Test-Path (Join-Path $emptyDestination 'stderr.txt'))) { throw 'An empty stdout prevented stderr export.' }
+
     'malformed secret discovery' | Set-Content $discovery
     $badDestination = Join-Path $root 'malformed-discovery'
     Export-SmokeDiagnostics -Directory $badDestination -Stage 'bridge' -Status 'FAIL' -LogPaths @($log) -DiscoveryFile $discovery
