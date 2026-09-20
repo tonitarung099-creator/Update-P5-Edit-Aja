@@ -56,6 +56,25 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         wrapper = (ROOT / "scripts/windows/prepare-package-images.ps1").read_text()
         self.assertIn("'--check-installer-tools'", wrapper)
 
+    def test_packaged_app_smoke_follows_uploaded_artifact(self):
+        names = [step["name"] for step in self.windows["steps"]]
+        collect = names.index("Collect Windows package")
+        upload = names.index("Upload Update P5 Edit Aja Windows package")
+        smoke = names.index("Smoke test packaged Windows installer and app")
+        source = names.index("Upload verified corresponding source")
+        self.assertLess(collect, upload)
+        self.assertLess(upload, smoke)
+        self.assertLess(smoke, source)
+
+    def test_packaged_app_smoke_installs_probes_starts_and_uninstalls(self):
+        script = (ROOT / "scripts/windows/smoke-test-package.ps1").read_text()
+        self.assertIn("'/S', '/CurrentUser'", script)
+        self.assertIn('"/D=$installRoot"', script)
+        self.assertIn("'bin/kdenlive.exe'", script)
+        self.assertIn("@('--version')", script)
+        self.assertIn("Start-Sleep -Seconds 15", script)
+        self.assertIn("'uninstall.exe'", script)
+
     def test_build_uses_the_commit_that_passed_quality_gates(self):
         checkout = self.windows["steps"][0]
         self.assertTrue(checkout["uses"].startswith("actions/checkout@"))
