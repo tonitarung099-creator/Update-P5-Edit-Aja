@@ -52,6 +52,10 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         self.assertLess(compile_app, full)
         self.assertLess(full, package)
 
+    def test_both_preflight_modes_require_installer_tools(self):
+        wrapper = (ROOT / "scripts/windows/prepare-package-images.ps1").read_text()
+        self.assertIn("'--check-installer-tools'", wrapper)
+
     def test_build_uses_the_commit_that_passed_quality_gates(self):
         checkout = self.windows["steps"][0]
         self.assertTrue(checkout["uses"].startswith("actions/checkout@"))

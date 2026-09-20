@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -47,7 +49,42 @@ def create_windows_junction(source: Path, destination: Path) -> None:
         )
 
 
-def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = False) -> int:
+def verify_installer_tools() -> None:
+    """Exercise Craft's actual embedded-7z lookup and executable tool commands."""
+    from Blueprints.CraftVersion import CraftVersion
+    from CraftCore import CraftCore
+    from Packager.NullsoftInstallerPackager import NullsoftInstallerPackager
+
+    makensis = CraftCore.cache.findApplication("makensis")
+    archive_tool = CraftCore.cache.findApplication("7za")
+    if not makensis or not archive_tool:
+        raise RuntimeError("Installer tools missing: Craft must find both makensis and 7za")
+
+    def run(executable, *arguments):
+        result = subprocess.run(
+            [str(executable), *arguments], capture_output=True, text=True,
+            errors="replace", timeout=30, check=False,
+        )
+        if result.returncode:
+            raise RuntimeError(f"Installer tool failed: {executable}: {result.stdout}{result.stderr}")
+        return result.stdout.strip()
+
+    version = run(makensis, "/VERSION")
+    if not re.fullmatch(r"v?\d+\.\d+(?:\.\d+)?", version, re.IGNORECASE) or CraftVersion(version) < CraftVersion("3.03"):
+        raise RuntimeError(f"NSIS 3.03 or newer required, found {version}")
+    run(archive_tool, "i")
+    with tempfile.TemporaryDirectory(prefix="p5-installer-check-") as temporary:
+        # This method does not use self. Call the pinned packager's implementation
+        # so a working PATH shim cannot hide a missing installer payload again.
+        embedded = NullsoftInstallerPackager._prepare7Z(None, temporary)
+        if embedded is None or not Path(embedded).is_file():
+            raise RuntimeError("Craft NSIS could not prepare its embedded 7za.exe")
+        run(embedded, "i")
+    print(f"Installer tools verified: NSIS {version}, archive 7za, embedded 7za.exe.")
+
+
+def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = False,
+            check_installer_tools: bool = False) -> int:
     craft_root = craft_root.resolve()
     craft_bin = craft_root / "craft" / "bin"
     if not craft_bin.is_dir():
@@ -77,6 +114,24 @@ def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = Fa
         depType=DependencyType.Runtime | DependencyType.Packaging,
         ignoredPackages=owner.ignoredPackages,
     )
+    dependencies = list(dependencies)
+    seven_zip = None
+    seven_zip_payload = None
+    if check_installer_tools:
+        from CraftCompiler import CraftCompiler
+        from CraftCore import CraftCore
+
+        # NSIS reads this tool directly; it is absent from the app's runtime /
+        # packaging graph. Do not add developer tools to the shipped payload.
+        seven_zip = CraftPackageObject.get("dev-utils/7zip-base")
+        if seven_zip is None:
+            raise RuntimeError("Craft installer dependency not found: dev-utils/7zip-base")
+        if all(dep.path != seven_zip.path for dep in dependencies):
+            dependencies.append(seven_zip)
+        seven_zip_payload = Path("dev-utils/7z") / (
+            "x64/7za.exe" if CraftCore.compiler.architecture == CraftCompiler.Architecture.x86_64
+            else "7za.exe"
+        )
 
     repairs = []
     missing = []
@@ -89,14 +144,17 @@ def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = Fa
 
         desired = Path(instance.imageDir())
         if desired.is_dir():
+            if seven_zip is not None and dependency.path == seven_zip.path:
+                if not (desired / seven_zip_payload).is_file():
+                    missing.append((str(dependency), str(desired / seven_zip_payload)))
             continue
 
-        # Bootstrap installs the MinGW runtime and prebuilt SnoreToast under
-        # MinSizeRel (confirmed in Builds #51/#60). SnoreToast's MinGW recipe
-        # copies the same upstream binary archive for every release build type.
+        # Bootstrap installs runtime, SnoreToast and 7zip-base under MinSizeRel
+        # (Builds #51/#60/#61). Both binary tool recipes copy the same upstream
+        # archive for every release build type; never substitute another target.
         # Do not extend this exception to source-built Qt or the application.
         compatible_package = dependency.path == "libs/runtime" or (
-            dependency.path == "dev-utils/snoretoast"
+            dependency.path in {"dev-utils/snoretoast", "dev-utils/7zip-base"}
             and isinstance(instance, BinaryPackageBase)
         )
         candidates = (
@@ -104,6 +162,8 @@ def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = Fa
             if compatible_package
             else []
         )
+        if seven_zip is not None and dependency.path == seven_zip.path:
+            candidates = [path for path in candidates if (path / seven_zip_payload).is_file()]
         if not candidates:
             missing.append((str(dependency), str(desired)))
             continue
@@ -123,6 +183,8 @@ def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = Fa
         print(f"Packaging image compatibility: {dependency}: {desired.name} -> {source.name}")
         create_windows_junction(source, desired)
 
+    if check_installer_tools:
+        verify_installer_tools()
     print(f"Packaging image preparation complete; repaired {len(repairs)} image path(s).")
     return 0
 
@@ -137,8 +199,11 @@ def main() -> int:
     parser.add_argument("--package", default="kde/kdemultimedia/editaja")
     parser.add_argument("--dependencies-only", action="store_true",
                         help="Check dependencies before compiling; full packaging check must follow the build.")
+    parser.add_argument("--check-installer-tools", action="store_true",
+                        help="Validate NSIS and both archive/embedded 7-Zip tools.")
     args = parser.parse_args()
-    return prepare(args.craft_root.resolve(), args.package, dependencies_only=args.dependencies_only)
+    return prepare(args.craft_root.resolve(), args.package, dependencies_only=args.dependencies_only,
+                   check_installer_tools=args.check_installer_tools)
 
 
 if __name__ == "__main__":
