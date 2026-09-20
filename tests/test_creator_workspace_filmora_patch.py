@@ -42,9 +42,13 @@ class CreatorWorkspaceFilmoraPatchTests(unittest.TestCase):
         self.assertNotIn('kdenlive_cut_clip', self.patch)
         self.assertNotIn('kdenlive_save_project', self.patch)
 
-    def test_polish_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
-        self.assertEqual(entry["name"], "creator-workspace-filmora")
+    def test_polish_patch_precedes_agent_toolbox_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        polish_index = names.index("creator-workspace-filmora")
+        toolbox_index = names.index("ai-agent-toolbox")
+        self.assertLess(polish_index, toolbox_index)
+
+        entry = self.manifest["apply_chain"][polish_index]
         self.assertEqual(entry["path"], "patches/creator-workspace-filmora.patch")
         self.assertTrue(entry["check"])
         self.assertTrue(entry["ignore_space_change"])
@@ -59,7 +63,12 @@ class CreatorWorkspaceFilmoraPatchTests(unittest.TestCase):
         )
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("creator-workspace-filmora.patch", 1)]'))
+        self.assertIn('("creator-workspace-filmora.patch", 1)', chain)
+        self.assertIn('("ai-agent-toolbox.patch", 1)', chain)
+        self.assertLess(
+            chain.index('("creator-workspace-filmora.patch", 1)'),
+            chain.index('("ai-agent-toolbox.patch", 1)'),
+        )
 
 
 if __name__ == "__main__":
