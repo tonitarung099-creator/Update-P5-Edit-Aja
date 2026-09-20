@@ -23,6 +23,10 @@ TEXT_CHECKS = [
     ("src/aiassistant/openaicompatibleagent.cpp", r"agent_image_paths", "Phase 15 multi-keyframe vision handoff"),
     ("src/mainwindow.cpp", r"const bool outputExists = output\.exists\(\);", "Native save target existence check"),
     ("src/mainwindow.cpp", r"saveFileAs\(output\.absoluteFilePath\(\), outputExists && overwrite, saveCopy\)", "Native save overwrite semantics"),
+    ("src/mainwindow.cpp", r'm_aiAssistantDock = addDock\(i18n\("AI Agent"\)', "AI Agent right-sidebar dock"),
+    ("src/mainwindow.cpp", r"Keep AI Agent as the primary right sidebar", "AI Agent post-layout docking"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"aiAssistantScrollArea", "Scrollable AI Agent sidebar"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"AI Agent — Main Control", "AI Agent primary command surface"),
 ]
 
 
