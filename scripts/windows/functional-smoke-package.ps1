@@ -63,11 +63,22 @@ function Invoke-AgentTool {
         [Parameter(Mandatory = $true)][string]$BaseUrl,
         [Parameter(Mandatory = $true)][string]$Token,
         [Parameter(Mandatory = $true)][string]$Name,
-        [hashtable]$Arguments = @{}
+        [hashtable]$Arguments = @{},
+        [int]$TimeoutSeconds = 30
     )
 
     $body = @{ name = $Name; arguments = $Arguments } | ConvertTo-Json -Depth 20 -Compress
-    $response = Invoke-RestMethod -Method Post -Uri "$BaseUrl/tools/call" -Headers @{ Authorization = "Bearer $Token" } -ContentType 'application/json' -Body $body -TimeoutSec 30
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-Host "Native tool call: $Name (timeout ${TimeoutSeconds}s)"
+    try {
+        $response = Invoke-RestMethod -Method Post -Uri "$BaseUrl/tools/call" -Headers @{ Authorization = "Bearer $Token" } -ContentType 'application/json' -Body $body -TimeoutSec $TimeoutSeconds
+    }
+    catch {
+        $timer.Stop()
+        throw "Native tool '$Name' HTTP call failed after $([Math]::Round($timer.Elapsed.TotalSeconds, 1))s: $($_.Exception.Message)"
+    }
+    $timer.Stop()
+    Write-Host "Native tool call complete: $Name in $([Math]::Round($timer.Elapsed.TotalSeconds, 1))s."
 
     if (-not $response.ok) {
         throw "REST wrapper rejected tool '$Name': $($response | ConvertTo-Json -Depth 20 -Compress)"
@@ -232,7 +243,12 @@ try {
     }
     Write-Host 'Subtitle native edit PASS.'
 
-    [void](Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_save_project' -Arguments @{ path = $savedProjectPath; save_copy = $true; overwrite = $true })
+    # Saving a real editor project performs more work than lightweight timeline
+    # queries (serialization plus cache/thumbnail housekeeping). Build #66 proved
+    # that the previous generic 30-second HTTP timeout could cancel the client
+    # while the editor was still saving. Keep normal tools strict, but give the
+    # save boundary enough time to complete and verify the file afterward.
+    [void](Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_save_project' -Arguments @{ path = $savedProjectPath; save_copy = $true; overwrite = $true } -TimeoutSeconds 120)
     if (-not (Test-Path $savedProjectPath -PathType Leaf)) {
         throw "Native save tool reported success but project copy was not created: $savedProjectPath"
     }
