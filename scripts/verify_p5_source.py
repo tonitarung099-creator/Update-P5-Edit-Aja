@@ -30,6 +30,8 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r"creatorAiAgentButton", "Filmora-style primary AI Agent workspace button"),
     ("src/mainwindow.cpp", r"Qt::ToolButtonTextUnderIcon", "Filmora-style Creator Workspace category layout"),
     ("src/mainwindow.cpp", r"Quick Edit: potong 5", "Creator Workspace Quick Edit command surface"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"aiAssistantToolbox", "Compact AI Agent supporting-tool toolbox"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"toolBox->addItem\(localEditGroup, i18n\(\"Quick Edit\"\)\)", "AI Agent Quick Edit toolbox page"),
 ]
 
 
