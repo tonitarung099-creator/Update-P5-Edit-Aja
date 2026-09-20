@@ -101,6 +101,16 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         ):
             self.assertIn(token, script)
 
+    def test_functional_save_has_a_dedicated_timeout_and_timing_logs(self):
+        script = (ROOT / "scripts/windows/functional-smoke-package.ps1").read_text()
+        self.assertIn("[int]$TimeoutSeconds = 30", script)
+        self.assertIn("Native tool call: $Name", script)
+        self.assertIn("Native tool call complete: $Name", script)
+        self.assertIn(
+            "-Name 'kdenlive_save_project' -Arguments @{ path = $savedProjectPath; save_copy = $true; overwrite = $true } -TimeoutSeconds 120",
+            script,
+        )
+
     def test_dependency_install_retries_transient_network_failures(self):
         script = (ROOT / "scripts/windows/invoke-craft.ps1").read_text()
         install_block = script.split("'install-deps' {", 1)[1].split("'build' {", 1)[0]
