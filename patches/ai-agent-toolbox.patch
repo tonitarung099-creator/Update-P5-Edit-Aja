@@ -1,0 +1,79 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -43,6 +43,7 @@
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
++#include <QToolBox>
+ #include <QStringList>
+ #include <QVBoxLayout>
+ #include <QVector>
+@@ -323,6 +324,10 @@
+     makeQuick(i18n("Effects"), QString(), QStringLiteral("effects"), 1, 1);
+     makeQuick(i18n("Transitions"), QString(), QStringLiteral("transitions"), 2, 0);
+     makeQuick(i18n("Audio Mixer"), QString(), QStringLiteral("audio"), 2, 1);
++
++    auto *toolBox = new QToolBox(this);
++    toolBox->setObjectName(QStringLiteral("aiAssistantToolbox"));
++    toolBox->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+ 
+     auto *localEditGroup = new QGroupBox(i18n("Local Edit — Lightweight"), this);
+     auto *localEditLayout = new QGridLayout(localEditGroup);
+@@ -362,7 +367,7 @@
+     localEditLayout->addWidget(historyLabel, 4, 0, 1, 2);
+     localEditLayout->addWidget(m_localEditClearHistoryButton, 4, 2);
+     localEditLayout->addWidget(m_localEditHistory, 5, 0, 1, 3);
+-    layout->addWidget(localEditGroup);
++    toolBox->addItem(localEditGroup, i18n("Quick Edit"));
+ 
+     auto previewLocalEdit = [this]() {
+         const QJsonObject result = previewLocalEditCommand(m_localEditInput->text());
+@@ -416,7 +421,7 @@
+     m_filmContextStatus = new QLabel(i18n("Disabled · no movie data is exposed to the API"), filmGroup);
+     m_filmContextStatus->setWordWrap(true);
+     filmLayout->addWidget(m_filmContextStatus, 4, 0, 1, 3);
+-    layout->addWidget(filmGroup);
++    toolBox->addItem(filmGroup, i18n("Film Context"));
+ 
+     m_filmContextIndexer = new QProcess(this);
+     m_filmContextIndexer->setProcessChannelMode(QProcess::MergedChannels);
+@@ -560,7 +565,7 @@
+     m_attachVisionFrames->setChecked(false);
+     m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next API turn. Leave this off for text-only models."));
+     apiForm->addRow(QString(), m_attachVisionFrames);
+-    layout->addWidget(apiGroup);
++    toolBox->addItem(apiGroup, i18n("API"));
+ 
+     auto *mcpGroup = new QGroupBox(i18n("MCP"), this);
+     auto *mcpLayout = new QVBoxLayout(mcpGroup);
+@@ -570,7 +575,7 @@
+     auto *mcpHelp = new QLabel(i18n("External agents can use tools/mcp/kdenlive_mcp_server.py or the localhost REST API. Both are protected by the same per-session token."), mcpGroup);
+     mcpHelp->setWordWrap(true);
+     mcpLayout->addWidget(mcpHelp);
+-    layout->addWidget(mcpGroup);
++    toolBox->addItem(mcpGroup, i18n("MCP"));
+ 
+     auto *aiEditGroup = new QGroupBox(i18n("AI Edit JSON"), this);
+     auto *aiEditLayout = new QGridLayout(aiEditGroup);
+@@ -594,7 +599,9 @@
+     aiEditLayout->addWidget(m_aiEditOpenButton, 2, 0);
+     aiEditLayout->addWidget(m_aiEditPreviewButton, 2, 1);
+     aiEditLayout->addWidget(m_aiEditApplyButton, 2, 2);
+-    layout->addWidget(aiEditGroup);
++    toolBox->addItem(aiEditGroup, i18n("AI Edit"));
++    toolBox->setCurrentIndex(0);
++    layout->addWidget(toolBox);
+ 
+     connect(m_aiEditOpenButton, &QPushButton::clicked, this, &AiAssistantWidget::chooseAiEditJson);
+     connect(m_aiEditPreviewButton, &QPushButton::clicked, this, &AiAssistantWidget::previewAiEditJson);
+@@ -625,7 +632,9 @@
+         "#aiAssistantWidget QPushButton[primaryAction=\"true\"] { font-weight: 600; padding: 8px 12px; border-radius: 6px; }"
+         "#aiAssistantWidget QLineEdit { padding: 7px 9px; border-radius: 6px; }"
+         "#aiAssistantWidget QTextBrowser { border-radius: 6px; padding: 6px; }"
+-        "#aiAssistantWidget QGroupBox#aiAgentMainControl { font-weight: 600; margin-top: 6px; }"));
++        "#aiAssistantWidget QGroupBox#aiAgentMainControl { font-weight: 600; margin-top: 6px; }"
++        "#aiAssistantWidget QToolBox#aiAssistantToolbox::tab { padding: 8px 10px; font-weight: 600; }"
++        "#aiAssistantWidget QToolBox#aiAssistantToolbox::tab:selected { background: palette(midlight); border-radius: 6px; }"));
+ }
+ 
+ void AiAssistantWidget::configureEditorAccess(ActionCatalogProvider actionCatalog, ActionExecutor actionExecutor, PanelCatalogProvider panelCatalog,
