@@ -1,0 +1,67 @@
+name: Build SubAja Windows EXE
+
+on:
+  push:
+    branches: [subaja-app]
+    paths:
+      - "subaja-build/**"
+      - ".github/workflows/build-subaja-windows.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Reconstruct source
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem "subaja-build/part-*.txt" | Sort-Object Name
+          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ""
+          [IO.File]::WriteAllBytes("SubAja-source.zip", [Convert]::FromBase64String($b64))
+          $hash = (Get-FileHash "SubAja-source.zip" -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "caef54cc8ca233e2c00d97ec0520775d9ca555d443ea7abc0ce0fa72a1379c1a") {
+            throw "Source checksum mismatch: $hash"
+          }
+          Expand-Archive -Path "SubAja-source.zip" -DestinationPath "." -Force
+
+      - name: Install dependencies
+        shell: pwsh
+        working-directory: SubAja
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+
+      - name: Download offline speaker models
+        shell: pwsh
+        working-directory: SubAja
+        run: python scripts/download_models.py
+
+      - name: Run tests
+        shell: pwsh
+        working-directory: SubAja
+        run: python -m pytest -q
+
+      - name: Build SubAja.exe
+        shell: pwsh
+        working-directory: SubAja
+        run: python -m PyInstaller build/SubAja.spec --noconfirm --clean
+
+      - name: Verify EXE
+        shell: pwsh
+        run: |
+          if (!(Test-Path "SubAja/dist/SubAja.exe")) { throw "SubAja.exe was not created" }
+          Get-Item "SubAja/dist/SubAja.exe" | Format-List Name,Length,FullName
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SubAja-Windows-EXE
+          path: SubAja/dist/SubAja.exe
+          if-no-files-found: error
+          retention-days: 30
