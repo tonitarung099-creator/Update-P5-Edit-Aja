@@ -228,3 +228,31 @@ name and elapsed time. The saved copy must still exist, be nontrivial in size,
 and leave the active project path unchanged before the save boundary can PASS.
 If the native save itself is genuinely stuck, the longer boundary will still
 fail and the named timing log will make that failure attributable.
+
+
+## Build #68: native save-copy blocked by existing-file semantics
+
+Build #68 (`35501973401`, main `6c53685a...`) again passed source
+reconstruction, dependencies, compilation, packaging, artifact upload,
+installer/startup, REST discovery, project load, a real timeline split
+(2 clips to 4), and native subtitle creation/readback. Unlike Builds #66/#67,
+the save call had its dedicated 120-second timeout and per-tool timing. The
+`kdenlive_save_project` request still did not return within 120 seconds, so
+the save boundary is a real native/runtime blocker rather than a 30-second test
+artifact.
+
+Source inspection found that the agent tool passed its public `overwrite=true`
+permission directly as `ProjectManager::saveFileAs(..., saveOverExistingFile,
+...)`. Kdenlive's second parameter is not merely permission; it means the
+target is an existing project being overwritten and enables upgraded/modified
+project backup notification behavior. The functional smoke saves to a brand-new
+copy path, so treating that new path as an existing overwrite can enter the
+backup/message-box path. A modal notification has no operator in CI and can
+block the REST call indefinitely.
+
+`patches/save-project-agent.patch` now captures whether the target actually
+exists before saving. A new path is saved with `saveOverExistingFile=false`;
+an existing destination still requires the public `overwrite=true` permission
+before the overwrite path is used. Reconstruction and Craft apply the same patch
+after the prior native fixes, and source verification requires the corrected
+call shape.

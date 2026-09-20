@@ -29,22 +29,24 @@ class KeyframeApiCompileFixTests(unittest.TestCase):
         self.assertNotIn("rectModel->removeAllKeyframes()", added)
         self.assertNotIn("rectModel->addKeyframe(", added)
 
-    def test_fix_is_last_source_patch(self):
-        self.assertEqual(
-            self.manifest["apply_chain"][-1]["name"],
-            "keyframe-api-compile-fix",
-        )
-        self.assertEqual(
-            self.manifest["apply_chain"][-1]["path"],
-            "patches/keyframe-api-compile-fix.patch",
-        )
-        self.assertTrue(self.manifest["apply_chain"][-1]["check"])
-        self.assertTrue(self.manifest["apply_chain"][-1]["ignore_space_change"])
+    def test_fix_precedes_native_save_patch(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        keyframe = names.index("keyframe-api-compile-fix")
+        save_fix = names.index("save-project-agent")
+        self.assertLess(keyframe, save_fix)
+        entry = self.manifest["apply_chain"][keyframe]
+        self.assertEqual(entry["path"], "patches/keyframe-api-compile-fix.patch")
+        self.assertTrue(entry["check"])
+        self.assertTrue(entry["ignore_space_change"])
 
-    def test_craft_blueprint_applies_same_fix_last(self):
+    def test_craft_blueprint_preserves_keyframe_before_save_fix(self):
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
         self.assertIn('("keyframe-api-compile-fix.patch", 1)', chain)
-        self.assertTrue(chain.rstrip().endswith('("keyframe-api-compile-fix.patch", 1)]'))
+        self.assertIn('("save-project-agent.patch", 1)', chain)
+        self.assertLess(
+            chain.index('("keyframe-api-compile-fix.patch", 1)'),
+            chain.index('("save-project-agent.patch", 1)'),
+        )
 
 
 if __name__ == "__main__":

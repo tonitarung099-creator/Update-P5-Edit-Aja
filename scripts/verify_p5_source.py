@@ -21,6 +21,8 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"movie_search", "Phase 15 Film Context agent tools"),
     ("src/aiassistant/aiassistantwidget.cpp", r"Build Visual Index \(Optional\)", "Phase 15 optional visual index UI"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"agent_image_paths", "Phase 15 multi-keyframe vision handoff"),
+    ("src/mainwindow.cpp", r"const bool outputExists = output\.exists\(\);", "Native save target existence check"),
+    ("src/mainwindow.cpp", r"saveFileAs\(output\.absoluteFilePath\(\), outputExists && overwrite, saveCopy\)", "Native save overwrite semantics"),
 ]
 
 
