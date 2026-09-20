@@ -129,6 +129,13 @@
       "path": "patches/save-project-agent.patch",
       "strip": 1,
       "check": true
+    },
+    {
+      "name": "ai-agent-sidebar",
+      "path": "patches/ai-agent-sidebar.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -159,6 +166,10 @@
     {
       "source": "patches/save-project-agent.patch",
       "destination": "craft/editaja/save-project-agent.patch"
+    },
+    {
+      "source": "patches/ai-agent-sidebar.patch",
+      "destination": "craft/editaja/ai-agent-sidebar.patch"
     }
   ]
 }
