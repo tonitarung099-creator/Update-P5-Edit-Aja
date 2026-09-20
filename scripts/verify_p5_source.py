@@ -27,6 +27,9 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r"Keep AI Agent as the primary right sidebar", "AI Agent post-layout docking"),
     ("src/aiassistant/aiassistantwidget.cpp", r"aiAssistantScrollArea", "Scrollable AI Agent sidebar"),
     ("src/aiassistant/aiassistantwidget.cpp", r"AI Agent — Main Control", "AI Agent primary command surface"),
+    ("src/mainwindow.cpp", r"creatorAiAgentButton", "Filmora-style primary AI Agent workspace button"),
+    ("src/mainwindow.cpp", r"Qt::ToolButtonTextUnderIcon", "Filmora-style Creator Workspace category layout"),
+    ("src/mainwindow.cpp", r"Quick Edit: potong 5", "Creator Workspace Quick Edit command surface"),
 ]
 
 
