@@ -35,11 +35,28 @@ try {
         throw 'Diagnostics did not retain the failed stage and checked-out commit.'
     }
 
+    # A GUI application often produces no stdout. Exercise a genuinely empty
+    # redirected file with a live discovery token, as in the packaged smoke.
+    $emptyLog = Join-Path $root 'empty-stdout.txt'
+    [System.IO.File]::WriteAllBytes($emptyLog, [byte[]]@())
+    $emptyDestination = Join-Path $root 'empty-output'
+    Export-SmokeDiagnostics -Directory $emptyDestination -Stage 'save_copy' -Status 'PASS' -LogPaths @($emptyLog, $log) -DiscoveryFile $discovery
+    if (-not (Test-Path (Join-Path $emptyDestination 'result.json'))) { throw 'An empty log lost the stage report.' }
+    if (-not (Test-Path (Join-Path $emptyDestination 'stderr.txt'))) { throw 'An empty stdout prevented stderr export.' }
+    $emptyResult = Get-Content (Join-Path $emptyDestination 'result.json') -Raw | ConvertFrom-Json
+    if ($emptyResult.status -ne 'PASS' -or $emptyResult.stage -ne 'save_copy') { throw 'Empty output changed the recorded test result.' }
+    $emptySaved = [System.IO.File]::ReadAllText((Join-Path $emptyDestination 'empty-stdout.txt'))
+    if ($emptySaved.Trim().Length -ne 0) { throw 'Empty stdout acquired unexpected content.' }
+    $stderrSaved = Get-Content (Join-Path $emptyDestination 'stderr.txt') -Raw
+    if ($stderrSaved.Contains($token) -or $stderrSaved.Contains('other-secret-42') -or -not $stderrSaved.Contains('useful error')) {
+        throw 'Redaction or stderr evidence failed after empty stdout.'
+    }
+
     'malformed secret discovery' | Set-Content $discovery
     $badDestination = Join-Path $root 'malformed-discovery'
     Export-SmokeDiagnostics -Directory $badDestination -Stage 'bridge' -Status 'FAIL' -LogPaths @($log) -DiscoveryFile $discovery
     if (Test-Path (Join-Path $badDestination 'stderr.txt')) { throw 'Unredacted logs were exported with malformed discovery data.' }
     if (-not (Test-Path (Join-Path $badDestination 'result.json'))) { throw 'Failure-stage report is missing.' }
-    Write-Host 'Smoke support tests PASS: process exit, cleanup, stage evidence, redaction, missing logs, malformed discovery.'
+    Write-Host 'Smoke support tests PASS: process exit, cleanup, stage evidence, redaction, empty/missing logs, malformed discovery.'
 }
 finally { Remove-Item $root -Recurse -Force }
