@@ -36,9 +36,12 @@ class AiAgentSidebarPatchTests(unittest.TestCase):
         )
         self.assertNotIn("m_aiAssistantDock->close();", added)
 
-    def test_sidebar_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
-        self.assertEqual(entry["name"], "ai-agent-sidebar")
+    def test_sidebar_patch_precedes_workspace_polish_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        sidebar_index = names.index("ai-agent-sidebar")
+        polish_index = names.index("creator-workspace-filmora")
+        self.assertLess(sidebar_index, polish_index)
+        entry = self.manifest["apply_chain"][sidebar_index]
         self.assertEqual(entry["path"], "patches/ai-agent-sidebar.patch")
         self.assertTrue(entry["check"])
         payloads = {
@@ -50,7 +53,12 @@ class AiAgentSidebarPatchTests(unittest.TestCase):
             "craft/editaja/ai-agent-sidebar.patch",
         )
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("ai-agent-sidebar.patch", 1)]'))
+        self.assertIn('("ai-agent-sidebar.patch", 1)', chain)
+        self.assertIn('("creator-workspace-filmora.patch", 1)', chain)
+        self.assertLess(
+            chain.index('("ai-agent-sidebar.patch", 1)'),
+            chain.index('("creator-workspace-filmora.patch", 1)'),
+        )
 
 
 if __name__ == "__main__":
