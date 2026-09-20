@@ -53,7 +53,10 @@ function Export-SmokeDiagnostics {
     }
     foreach ($path in $LogPaths) {
         if (Test-Path -LiteralPath $path -PathType Leaf) {
-            $content = [string](Get-Content -LiteralPath $path -Raw)
+            # Get-Content -Raw can yield AutomationNull for a zero-byte file,
+            # even through the string cast used here previously. ReadAllText
+            # returns an actual empty string so token redaction remains safe.
+            $content = [System.IO.File]::ReadAllText((Convert-Path -LiteralPath $path))
             if ($token) { $content = $content.Replace($token, '[REDACTED]') }
             $content = $content -replace '(?i)(Bearer\s+)[A-Za-z0-9._~-]+', '$1[REDACTED]'
             Set-Content -LiteralPath (Join-Path $Directory ([System.IO.Path]::GetFileName($path))) -Value $content -Encoding utf8

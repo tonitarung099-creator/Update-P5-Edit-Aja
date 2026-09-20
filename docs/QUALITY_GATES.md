@@ -100,3 +100,11 @@ application has exited; cleanup warnings do not replace the original failure.
 export on the Windows quality gate before the full build. A smoke PASS covers
 only that script's assertions: startup, or project load/split/subtitle/save-copy.
 It does not prove video export, saved-project reopening, or successful uninstall.
+
+Build #70 (`35510901540`, source `17a3693e7bf7b25ae2a2f6f21c027229da3737aa`)
+passed the functional assertions, including save-copy in 0.1 seconds, but its
+functional diagnostic export warned about a null-valued method call. The cheap
+Windows regression in PR #33 reproduced that warning with a zero-byte stdout
+file and a discovery token. Diagnostic collection now uses `ReadAllText` to
+obtain an actual empty string before redaction. The regression checks that
+empty stdout does not prevent stderr redaction or the PASS/FAIL stage report.
