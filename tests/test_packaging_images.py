@@ -135,6 +135,54 @@ class PackagingPreflightTests(unittest.TestCase):
         self.dependencies.append(SimpleNamespace(path=name, instance=instance))
         return desired
 
+    def installer_dependency(self, *, desired_exists=False, alternative="MinSizeRel", payload=True, binary=True):
+        desired = self.dependency("dev-utils/7zip-base", desired_exists, alternative, binary)
+        seven_zip = self.dependencies.pop()  # intentionally outside the app graph
+        package_module = sys.modules["Blueprints.CraftPackageObject"]
+        package_module.CraftPackageObject.get = lambda name: seven_zip if name == seven_zip.path else SimpleNamespace(path=name, instance=self.owner)
+        compiler = ModuleType("CraftCompiler")
+        compiler.CraftCompiler = SimpleNamespace(Architecture=SimpleNamespace(x86_64="x64"))
+        core = ModuleType("CraftCore")
+        core.CraftCore = SimpleNamespace(compiler=SimpleNamespace(architecture="x64"))
+        sys.modules["CraftCompiler"] = compiler
+        sys.modules["CraftCore"] = core
+        image = desired if desired_exists else desired.parent / f"image-{alternative}-14.2.0"
+        if payload:
+            (image / "dev-utils/7z/x64").mkdir(parents=True)
+            (image / "dev-utils/7z/x64/7za.exe").write_bytes(b"fixture")
+        return desired
+
+    def test_installer_tool_outside_app_graph_is_repaired_and_verified(self):
+        desired = self.installer_dependency()
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction, patch("scripts.prepare_package_images.verify_installer_tools") as verify:
+            self.assertEqual(prepare(self.root, "application", check_installer_tools=True), 0)
+            junction.assert_called_once_with(desired.parent / "image-MinSizeRel-14.2.0", desired)
+            verify.assert_called_once_with()
+
+    def test_missing_x64_payload_prevents_all_junctions(self):
+        self.dependency("libs/runtime")
+        self.installer_dependency(payload=False)
+        with patch("scripts.prepare_package_images.create_windows_junction") as junction:
+            with self.assertRaisesRegex(RuntimeError, "7zip-base"):
+                prepare(self.root, "application", check_installer_tools=True)
+            junction.assert_not_called()
+
+    def test_existing_but_incomplete_installer_image_is_rejected(self):
+        self.installer_dependency(desired_exists=True, payload=False)
+        with self.assertRaisesRegex(RuntimeError, "7za.exe"):
+            prepare(self.root, "application", check_installer_tools=True)
+
+    def test_source_built_installer_tool_is_rejected(self):
+        self.installer_dependency(binary=False)
+        with self.assertRaisesRegex(RuntimeError, "7zip-base"):
+            prepare(self.root, "application", check_installer_tools=True)
+
+    def test_installer_tool_execution_failure_propagates(self):
+        self.installer_dependency(desired_exists=True)
+        with patch("scripts.prepare_package_images.verify_installer_tools", side_effect=RuntimeError("broken tool")):
+            with self.assertRaisesRegex(RuntimeError, "broken tool"):
+                prepare(self.root, "application", check_installer_tools=True)
+
     def test_prebuilt_snoretoast_can_reuse_same_version_release_image(self):
         desired = self.dependency("dev-utils/snoretoast", binary=True)
         with patch("scripts.prepare_package_images.create_windows_junction") as junction:

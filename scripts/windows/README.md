@@ -84,3 +84,30 @@ Both the packager installation and dependency-image check now happen before
 compiling Edit Aja. The early check skips only the root application image; the
 mandatory post-compile check includes it. This catches missing packaging
 inputs before spending time on another full application compile.
+
+
+### Build #61: validate the installer tools themselves
+
+Build #61 (`35483805787`, main `4977b7a`) passed compilation and both image
+checks, then created the 129 MiB `.7z`. NSIS failed with `Failed to find 7z`
+and `@{7za} is not in variables`. Craft's pinned `_prepare7Z()` reads
+`7zip-base.imageDir()/dev-utils/7z/x64/7za.exe`, independently of the working
+archive-command shim. Bootstrap had installed 7zip-base 25.01 as MinSizeRel.
+The tool is outside the application's runtime/packaging dependency graph.
+
+Both Windows preflight calls now explicitly include the 7zip-base image without
+adding developer tools to the shipped application. Only its BinaryPackageBase
+recipe may reuse an exact-version release image, and the architecture-specific
+payload must exist before any junction is created. Existing incomplete images,
+Debug images, wrong versions and source-built tool replacements remain errors.
+
+Preflight then executes NSIS `/VERSION` (minimum 3.03), the archive tool `i`, and
+the embedded 7za `i` after calling Craft's actual `_prepare7Z()` copy/signing
+routine in a temporary directory. A working PATH shim cannot mask a missing or
+broken embedded executable. The normal installer generation remains mandatory.
+
+Regression tests use actual pinned Craft and its 7zip-base recipe, with isolated
+image paths and fixture bytes. Windows CI tests the real junction and repeated
+runs; executable responses are simulated in these tests. The full Windows build
+executes the actual installed tools before compilation. These tests do not prove
+NSIS installer generation, app startup, editing, export or release readiness.
