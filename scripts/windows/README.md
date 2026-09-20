@@ -207,3 +207,24 @@ between attempts, so a retry resumes from the remaining package set instead of
 discarding completed work. Compile, package, and application-runtime commands
 are not retried by this rule; deterministic failures in those stages remain
 immediate failures.
+
+
+## Build #66: functional editing reached project save
+
+Build #66 (`35497984665`, main `44013ce1...`) passed source reconstruction,
+dependencies, compilation, packaging, artifact upload, packaged install/startup,
+REST bridge discovery, native tool catalog checks, project loading, a real
+timeline split (2 clips to 4), and native subtitle creation/readback.
+
+The only failing boundary was the next `kdenlive_save_project` call. The
+functional-smoke client used the same 30-second HTTP timeout as lightweight
+queries and canceled the request exactly when that limit elapsed. That timeout
+does not prove the editor save operation failed; the test killed the app during
+cleanup immediately afterward.
+
+The smoke client now keeps the 30-second default for normal tools but allows up
+to 120 seconds specifically for project save, while logging each native tool
+name and elapsed time. The saved copy must still exist, be nontrivial in size,
+and leave the active project path unchanged before the save boundary can PASS.
+If the native save itself is genuinely stuck, the longer boundary will still
+fail and the named timing log will make that failure attributable.
