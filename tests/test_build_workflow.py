@@ -97,10 +97,19 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
             "kdenlive_add_subtitle",
             "kdenlive_list_subtitles",
             "kdenlive_save_project",
+            "kdenlive_list_panels",
+            "kdenlive_open_panel",
             "corresponding-source/tests/dataset/av.kdenlive",
             "FUNCTIONAL EDITOR SMOKE PASS",
         ):
             self.assertIn(token, script)
+
+    def test_functional_editor_smoke_verifies_ai_agent_panel(self):
+        script = (ROOT / "scripts/windows/functional-smoke-package.ps1").read_text()
+        self.assertIn("$stage = 'ai_panel'", script)
+        self.assertIn("-Name 'kdenlive_list_panels'", script)
+        self.assertIn("-Name 'kdenlive_open_panel' -Arguments @{ panel_name = 'ai' }", script)
+        self.assertIn("AI Agent panel PASS", script)
 
     def test_smoke_diagnostics_are_uploaded_even_after_test_failure(self):
         steps = self.windows["steps"]
