@@ -92,6 +92,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Smoke test packaged Windows installer and app
+        shell: pwsh
+        run: ./scripts/windows/smoke-test-package.ps1
+
       - name: Upload verified corresponding source
         if: ${{ always() && steps.corresponding_source.outcome == 'success' }}
         uses: actions/upload-artifact@v4
