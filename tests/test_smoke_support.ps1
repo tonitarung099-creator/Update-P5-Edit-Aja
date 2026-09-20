@@ -1,0 +1,45 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot\..\scripts\windows\smoke-test-support.ps1"
+
+$root = Join-Path ([System.IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
+New-Item -ItemType Directory $root | Out-Null
+try {
+    Assert-SmokeProcessRunning -Process (Get-Process -Id $PID) -Stage 'running fixture'
+    $pwsh = (Get-Process -Id $PID).Path
+    $exited = Start-Process -FilePath $pwsh -ArgumentList @('-NoProfile', '-Command', 'exit 7') -PassThru -Wait
+    $rejected = $false
+    try { Assert-SmokeProcessRunning -Process $exited -Stage 'bridge' }
+    catch {
+        $rejected = $_.Exception.Message -like '*bridge*code 7*'
+    }
+    if (-not $rejected) { throw 'Exited application was not rejected with its stage and exit code.' }
+    # Already-exited process cleanup must preserve the original failure.
+    Stop-SmokeProcessTree -Process $exited
+
+    $token = 'fixture-secret-73'
+    $discovery = Join-Path $root 'discovery.json'
+    @{ token = $token } | ConvertTo-Json | Set-Content $discovery
+    $log = Join-Path $root 'stderr.txt'
+    "useful error; token=$token; Authorization: Bearer other-secret-42" | Set-Content $log
+    $destination = Join-Path $root 'diagnostics'
+    Export-SmokeDiagnostics -Directory $destination -Stage 'subtitle_edit' -Status 'FAIL' -LogPaths @($log, (Join-Path $root 'missing.txt')) -DiscoveryFile $discovery
+    $saved = Get-Content (Join-Path $destination 'stderr.txt') -Raw
+    if ($saved.Contains($token) -or $saved.Contains('other-secret-42') -or -not $saved.Contains('useful error')) {
+        throw 'Diagnostics did not preserve evidence while redacting credentials.'
+    }
+    if (Test-Path (Join-Path $destination 'discovery.json')) { throw 'Discovery credentials were copied.' }
+    $result = Get-Content (Join-Path $destination 'result.json') -Raw | ConvertFrom-Json
+    if ($result.status -ne 'FAIL' -or $result.stage -ne 'subtitle_edit' -or $result.commit -ne (& git rev-parse HEAD).Trim()) {
+        throw 'Diagnostics did not retain the failed stage and checked-out commit.'
+    }
+
+    'malformed secret discovery' | Set-Content $discovery
+    $badDestination = Join-Path $root 'malformed-discovery'
+    Export-SmokeDiagnostics -Directory $badDestination -Stage 'bridge' -Status 'FAIL' -LogPaths @($log) -DiscoveryFile $discovery
+    if (Test-Path (Join-Path $badDestination 'stderr.txt')) { throw 'Unredacted logs were exported with malformed discovery data.' }
+    if (-not (Test-Path (Join-Path $badDestination 'result.json'))) { throw 'Failure-stage report is missing.' }
+    Write-Host 'Smoke support tests PASS: process exit, cleanup, stage evidence, redaction, missing logs, malformed discovery.'
+}
+finally { Remove-Item $root -Recurse -Force }

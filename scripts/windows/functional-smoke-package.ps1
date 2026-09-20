@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot\smoke-test-support.ps1"
 
 $packageRoot = Join-Path (Get-Location) 'artifacts/windows'
 $fixtureSource = Join-Path (Get-Location) 'corresponding-source/tests/dataset/av.kdenlive'
@@ -28,16 +29,15 @@ $projectPath = Join-Path $workRoot 'input.kdenlive'
 $savedProjectPath = Join-Path $workRoot 'saved-copy.kdenlive'
 $discoveryPath = Join-Path $env:TEMP 'kdenlive-open-agent.json'
 
+$diagnostics = Join-Path (Get-Location) 'artifacts/smoke/functional'
+$appStdout = Join-Path $env:RUNNER_TEMP 'editaja-functional-stdout.txt'
+$appStderr = Join-Path $env:RUNNER_TEMP 'editaja-functional-stderr.txt'
+$stage = 'install'
+$status = 'FAIL'
+Remove-Item $appStdout, $appStderr -Force -ErrorAction SilentlyContinue
+
 $appProcess = $null
 $installedRoot = $null
-
-function Stop-SmokeProcessTree {
-    param([System.Diagnostics.Process]$Process)
-    if ($null -eq $Process -or $Process.HasExited) {
-        return
-    }
-    & taskkill.exe /PID $Process.Id /T /F | Out-Host
-}
 
 function Resolve-InstalledRoot {
     if (-not (Test-Path -LiteralPath $installRegistryPath)) {
@@ -106,6 +106,7 @@ function Wait-AgentBridge {
     $lastError = $null
 
     while ((Get-Date) -lt $deadline) {
+        Assert-SmokeProcessRunning -Process $appProcess -Stage $stage
         if (Test-Path $DiscoveryFile -PathType Leaf) {
             try {
                 $discovery = Get-Content $DiscoveryFile -Raw | ConvertFrom-Json
@@ -142,6 +143,7 @@ function Wait-ProjectLoaded {
     $last = $null
 
     while ((Get-Date) -lt $deadline) {
+        Assert-SmokeProcessRunning -Process $appProcess -Stage $stage
         try {
             $last = Invoke-AgentTool -BaseUrl $BaseUrl -Token $Token -Name 'kdenlive_get_project_info'
             if ($last.path) {
@@ -184,13 +186,16 @@ try {
 
     Write-Host "Launching packaged editor with functional project: $projectPath"
     $quotedProject = '"' + $projectPath + '"'
-    $appProcess = Start-Process -FilePath $app -ArgumentList @($quotedProject) -PassThru
+    $stage = 'launch'
+    $appProcess = Start-Process -FilePath $app -ArgumentList @($quotedProject) -RedirectStandardOutput $appStdout -RedirectStandardError $appStderr -PassThru
 
+    $stage = 'bridge'
     $discovery = Wait-AgentBridge -DiscoveryFile $discoveryPath
     $baseUrl = "$($discovery.rest_base_url)"
     $token = "$($discovery.token)"
     Write-Host "REST bridge PASS: $baseUrl"
 
+    $stage = 'tool_catalog'
     $catalog = Invoke-AgentGet -Url "$baseUrl/tools" -Token $token
     $toolNames = @($catalog.tools | ForEach-Object { "$($_.name)" })
     $requiredTools = @(
@@ -208,9 +213,11 @@ try {
     }
     Write-Host "Native tool catalog PASS: $($requiredTools.Count) required tools are present."
 
+    $stage = 'project_load'
     $project = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $projectPath
     Write-Host "Project load PASS: $($project.path), duration=$($project.duration_frames) frames."
 
+    $stage = 'timeline_split'
     $before = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_timeline_state' -Arguments @{ include_items = $true }
     $clipsBefore = @($before.items | Where-Object { $_.kind -eq 'clip' -and [int]$_.duration_frames -ge 4 })
     if ($clipsBefore.Count -eq 0) {
@@ -233,6 +240,7 @@ try {
     }
     Write-Host "Timeline split PASS: clips $clipCountBefore -> $clipCountAfter."
 
+    $stage = 'subtitle_edit'
     $subtitleText = 'P5 functional smoke subtitle'
     [void](Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_add_subtitle' -Arguments @{ text = $subtitleText; start_seconds = 1.0; duration_seconds = 1.5; layer = 0 })
 
@@ -243,11 +251,9 @@ try {
     }
     Write-Host 'Subtitle native edit PASS.'
 
-    # Saving a real editor project performs more work than lightweight timeline
-    # queries (serialization plus cache/thumbnail housekeeping). Build #66 proved
-    # that the previous generic 30-second HTTP timeout could cancel the client
-    # while the editor was still saving. Keep normal tools strict, but give the
-    # save boundary enough time to complete and verify the file afterward.
+    $stage = 'save_copy'
+    # Keep the save-specific timeout while checking that the requested file is
+    # actually written. A longer timeout alone does not prove a successful save.
     [void](Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_save_project' -Arguments @{ path = $savedProjectPath; save_copy = $true; overwrite = $true } -TimeoutSeconds 120)
     if (-not (Test-Path $savedProjectPath -PathType Leaf)) {
         throw "Native save tool reported success but project copy was not created: $savedProjectPath"
@@ -264,10 +270,15 @@ try {
     }
 
     Write-Host "Project save-copy PASS: $savedProjectPath"
+    $status = 'PASS'
     Write-Host 'FUNCTIONAL EDITOR SMOKE PASS: REST/native registry, project load, timeline split, subtitle edit, and project save-copy.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess
+    try {
+        Export-SmokeDiagnostics -Directory $diagnostics -Stage $stage -Status $status -LogPaths @($appStdout, $appStderr) -DiscoveryFile $discoveryPath
+    }
+    catch { Write-Warning "Could not save smoke diagnostics: $($_.Exception.Message)" }
 
     if ($installedRoot) {
         $uninstaller = Join-Path $installedRoot 'uninstall.exe'

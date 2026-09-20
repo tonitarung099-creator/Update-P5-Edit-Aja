@@ -81,3 +81,22 @@ finished before opening the PR: the old default-branch workflow is still used
 for `workflow_run` events and can cancel an active build when PR checks finish.
 Then open the PR, require its quality gates to pass, merge, and verify scheduling
 on the resulting main commit. Do not bypass checks to install the new policy.
+
+## Packaged-application failure evidence
+
+The Windows build uploads `Update-P5-Edit-Aja-Smoke-Diagnostics` even when a
+smoke test fails, provided packaging succeeded. The `startup` and `functional`
+folders contain application stdout/stderr and a `result.json` recording the
+last attempted stage, PASS/FAIL, workflow run, and checked-out source commit.
+Missing folders mean that test did not reach diagnostic collection.
+
+Bridge discovery credentials are never uploaded. Known discovery tokens and
+Bearer credentials are redacted from logs; malformed discovery data suppresses
+raw-log export while retaining the stage report. Diagnostics are retained for
+14 days. Process checks stop startup/bridge/project-load polling when the
+application has exited; cleanup warnings do not replace the original failure.
+
+`tests/test_smoke_support.ps1` exercises process exit detection and diagnostic
+export on the Windows quality gate before the full build. A smoke PASS covers
+only that script's assertions: startup, or project load/split/subtitle/save-copy.
+It does not prove video export, saved-project reopening, or successful uninstall.
