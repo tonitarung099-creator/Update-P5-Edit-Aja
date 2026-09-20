@@ -111,3 +111,24 @@ image paths and fixture bytes. Windows CI tests the real junction and repeated
 runs; executable responses are simulated in these tests. The full Windows build
 executes the actual installed tools before compilation. These tests do not prove
 NSIS installer generation, app startup, editing, export or release readiness.
+
+
+## Build #62: first successful Windows package
+
+Build #62 (`35486692474`, main `c1e0ae94...`) completed the full Windows
+build and packaging path successfully. Craft produced the NSIS installer
+`editaja-HEAD-c3d8a38c04-editaja-windows-gcc-x86_64.exe`, and GitHub uploaded
+the `Update-P5-Edit-Aja-Windows-x64` artifact.
+
+Packaging success is not runtime proof. The build workflow therefore runs
+`smoke-test-package.ps1` after the Windows artifact has been collected and
+uploaded. The smoke test installs the NSIS package silently in CurrentUser mode
+to an isolated runner directory, verifies `bin/kdenlive.exe` and the
+uninstaller, runs the packaged executable with `--version`, launches the GUI
+process for 15 seconds to reject immediate startup crashes, then stops the
+process and uninstalls the test copy.
+
+This proves installer execution, packaged runtime loading, and basic startup on
+the Windows runner. It still does not prove project editing, media import,
+timeline operations, render/export, optional AI backends, Windows 11 hardware
+compatibility, or release readiness; those remain separate verification stages.
