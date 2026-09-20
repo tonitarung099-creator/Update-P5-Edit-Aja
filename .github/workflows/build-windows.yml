@@ -100,6 +100,15 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/functional-smoke-package.ps1
 
+      - name: Upload packaged-app smoke diagnostics
+        if: ${{ always() && steps.windows_package.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Update-P5-Edit-Aja-Smoke-Diagnostics
+          path: artifacts/smoke/**
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload verified corresponding source
         if: ${{ always() && steps.corresponding_source.outcome == 'success' }}
         uses: actions/upload-artifact@v4

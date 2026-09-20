@@ -75,7 +75,8 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         self.assertIn("Install_Dir", script)
         self.assertIn("'bin/kdenlive.exe'", script)
         self.assertIn("@('--version')", script)
-        self.assertIn("Start-Sleep -Seconds 15", script)
+        self.assertIn("$second -lt 15", script)
+        self.assertIn("Assert-SmokeProcessRunning", script)
         self.assertIn("'uninstall.exe'", script)
 
     def test_functional_editor_smoke_runs_after_startup_smoke(self):
@@ -100,6 +101,15 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
             "FUNCTIONAL EDITOR SMOKE PASS",
         ):
             self.assertIn(token, script)
+
+    def test_smoke_diagnostics_are_uploaded_even_after_test_failure(self):
+        steps = self.windows["steps"]
+        names = [step["name"] for step in steps]
+        upload = next(step for step in steps if step["name"] == "Upload packaged-app smoke diagnostics")
+        self.assertLess(names.index("Functional smoke test packaged editor"), names.index(upload["name"]))
+        self.assertEqual(upload["if"], "${{ always() && steps.windows_package.outcome == 'success' }}")
+        self.assertEqual(upload["with"]["path"], "artifacts/smoke/**")
+        self.assertEqual(upload["with"]["retention-days"], 14)
 
     def test_functional_save_has_a_dedicated_timeout_and_timing_logs(self):
         script = (ROOT / "scripts/windows/functional-smoke-package.ps1").read_text()

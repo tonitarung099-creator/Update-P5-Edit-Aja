@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot\smoke-test-support.ps1"
 
 $packageRoot = Join-Path (Get-Location) 'artifacts/windows'
 if (-not (Test-Path $packageRoot)) {
@@ -29,19 +30,15 @@ if (Test-Path $requestedInstallRoot) {
 }
 Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
 
+$diagnostics = Join-Path (Get-Location) 'artifacts/smoke/startup'
+$appStdout = Join-Path $env:RUNNER_TEMP 'editaja-startup-stdout.txt'
+$appStderr = Join-Path $env:RUNNER_TEMP 'editaja-startup-stderr.txt'
+$stage = 'install'
+$status = 'FAIL'
+Remove-Item $appStdout, $appStderr -Force -ErrorAction SilentlyContinue
+
 $appProcess = $null
 $installedRoot = $null
-
-function Stop-SmokeProcessTree {
-    param([System.Diagnostics.Process]$Process)
-
-    if ($null -eq $Process -or $Process.HasExited) {
-        return
-    }
-
-    # Kdenlive can create helper processes. Kill the whole CI-only process tree.
-    & taskkill.exe /PID $Process.Id /T /F | Out-Host
-}
 
 function Resolve-InstalledRoot {
     param(
@@ -93,6 +90,7 @@ try {
     # --version initializes the packaged executable and its DLL search path, but
     # exits without requiring GUI interaction. Missing runtime DLLs surface here
     # as a non-zero process exit instead of being mistaken for packaging success.
+    $stage = 'version'
     $version = Start-Process -FilePath $app -ArgumentList @('--version') -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 
     if (-not $version.WaitForExit(30000)) {
@@ -110,17 +108,22 @@ try {
     # A successful version probe is not enough to prove GUI startup. Launch the
     # packaged application normally and require it to remain alive long enough
     # to rule out an immediate startup/runtime crash.
-    $appProcess = Start-Process -FilePath $app -PassThru
-    Start-Sleep -Seconds 15
-    $appProcess.Refresh()
-    if ($appProcess.HasExited) {
-        throw "Packaged application exited during the 15-second startup smoke test with code $($appProcess.ExitCode)."
+    $stage = 'startup'
+    $appProcess = Start-Process -FilePath $app -RedirectStandardOutput $appStdout -RedirectStandardError $appStderr -PassThru
+    for ($second = 0; $second -lt 15; $second++) {
+        Start-Sleep -Seconds 1
+        Assert-SmokeProcessRunning -Process $appProcess -Stage $stage
     }
+    $status = 'PASS'
 
     Write-Host 'Packaged-app startup smoke PASS: process remained alive for 15 seconds.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess
+    try {
+        Export-SmokeDiagnostics -Directory $diagnostics -Stage $stage -Status $status -LogPaths @($stdout, $stderr, $appStdout, $appStderr) -DiscoveryFile (Join-Path $env:TEMP 'kdenlive-open-agent.json')
+    }
+    catch { Write-Warning "Could not save smoke diagnostics: $($_.Exception.Message)" }
 
     if ($installedRoot) {
         $uninstaller = Join-Path $installedRoot 'uninstall.exe'
