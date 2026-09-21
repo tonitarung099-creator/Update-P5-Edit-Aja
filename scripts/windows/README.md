@@ -281,8 +281,16 @@ editor window after opening the AI Agent panel. It saves
 heartbeat sample. The heartbeat is an idle responsiveness guard: timeouts or
 repeated samples above 500 ms fail that smoke stage.
 
-This evidence is deliberately narrow. One hosted-runner screenshot and idle
-heartbeat do not prove the full DPI matrix, keyboard/focus behavior, layout
-persistence, stress behavior, or responsiveness while a slow AI/subprocess job
-is active. Those remain separate UI acceptance work.
+The functional smoke also verifies one concrete persistence boundary before
+editing the project: it moves the packaged window to a deterministic test
+geometry, closes the application through the normal WM_CLOSE path, relaunches
+the same portable executable, and compares the restored window position and
+size within bounded pixel tolerances. It stores before/after screenshots plus
+`window-persistence.json` in the same UI diagnostics directory.
+
+This evidence is still deliberately narrow. It proves one normal window-geometry
+restart on the hosted Windows runner; it does not prove the full DPI matrix,
+keyboard/focus behavior, every dock/panel arrangement, stress behavior, or
+responsiveness while a slow AI/subprocess job is active. Those remain separate
+UI acceptance work.
 
