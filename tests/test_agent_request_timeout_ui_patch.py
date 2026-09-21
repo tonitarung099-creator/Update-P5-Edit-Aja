@@ -27,8 +27,15 @@ class AgentRequestTimeoutUiPatchTests(unittest.TestCase):
             self.assertIn(marker, self.patch)
 
     def test_timeout_setting_persists_and_drives_agent(self):
-        self.assertIn('settings.setValue(QStringLiteral("requestTimeoutSeconds"), m_requestTimeoutSeconds->value())', self.patch)
-        self.assertIn("m_agent->setRequestTimeoutMs(m_requestTimeoutSeconds->value() * 1000)", self.patch)
+        self.assertIn('setObjectName(QStringLiteral("agentRequestTimeoutSeconds"))', self.patch)
+        self.assertIn('QSpinBox::valueChanged', self.patch)
+        self.assertIn('setValue(QStringLiteral("requestTimeoutSeconds"), seconds)', self.patch)
+        self.assertIn('const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600)', self.patch)
+        self.assertIn("m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000)", self.patch)
+
+    def test_ui_patch_does_not_modify_crlf_header(self):
+        self.assertNotIn("aiassistantwidget.h", self.patch)
+        self.assertNotIn("m_requestTimeoutSeconds", self.patch)
 
     def test_ui_patch_is_last_and_copied_to_craft(self):
         entry = self.manifest["apply_chain"][-1]
