@@ -157,6 +157,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "creator-layout-reset",
+      "path": "patches/creator-layout-reset.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -203,6 +210,10 @@
     {
       "source": "patches/creator-layout-filmora.patch",
       "destination": "craft/editaja/creator-layout-filmora.patch"
+    },
+    {
+      "source": "patches/creator-layout-reset.patch",
+      "destination": "craft/editaja/creator-layout-reset.patch"
     }
   ]
 }
