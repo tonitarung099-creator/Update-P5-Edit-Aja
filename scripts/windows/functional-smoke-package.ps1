@@ -214,6 +214,58 @@ try {
     }
     Write-Host "UI evidence PASS: screenshot=$($screenshot.width)x$($screenshot.height) dpi=$($screenshot.dpi), heartbeat avg=$($heartbeat.average_ms)ms max=$($heartbeat.max_ms)ms."
 
+    $stage = 'window_persistence'
+    $boundsBeforeClose = Set-SmokeWindowBounds -Process $appProcess -Left 48 -Top 48 -Width 940 -Height 680
+    $beforeRestartScreenshot = Save-SmokeWindowScreenshot -Process $appProcess -Path (Join-Path $uiEvidenceDir 'window-before-restart.png')
+
+    # Close before any timeline/subtitle mutation so no unsaved-project dialog
+    # can invalidate the geometry persistence check.
+    Close-SmokeWindowGracefully -Process $appProcess
+    $appProcess = $null
+    Remove-Item $discoveryPath -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 750
+
+    $appProcess = Start-Process -FilePath $app -ArgumentList @($quotedProject) -RedirectStandardOutput $appStdout -RedirectStandardError $appStderr -PassThru
+    $discovery = Wait-AgentBridge -DiscoveryFile $discoveryPath
+    $baseUrl = "$($discovery.rest_base_url)"
+    $token = "$($discovery.token)"
+
+    $boundsAfterRestart = Get-SmokeWindowBounds -Process $appProcess
+    $afterRestartScreenshot = Save-SmokeWindowScreenshot -Process $appProcess -Path (Join-Path $uiEvidenceDir 'window-after-restart.png')
+    $sizeTolerance = 48
+    $positionTolerance = 96
+    $windowPersistence = [ordered]@{
+        captured_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        scope = 'window_geometry_after_graceful_restart'
+        before_close = $boundsBeforeClose
+        after_restart = $boundsAfterRestart
+        delta = [ordered]@{
+            left = [Math]::Abs([int]$boundsAfterRestart.left - [int]$boundsBeforeClose.left)
+            top = [Math]::Abs([int]$boundsAfterRestart.top - [int]$boundsBeforeClose.top)
+            width = [Math]::Abs([int]$boundsAfterRestart.width - [int]$boundsBeforeClose.width)
+            height = [Math]::Abs([int]$boundsAfterRestart.height - [int]$boundsBeforeClose.height)
+        }
+        tolerance = [ordered]@{
+            position_px = $positionTolerance
+            size_px = $sizeTolerance
+        }
+        screenshots = [ordered]@{
+            before_restart = $beforeRestartScreenshot.path
+            after_restart = $afterRestartScreenshot.path
+        }
+    }
+    $windowPersistence.pass = (
+        $windowPersistence.delta.left -le $positionTolerance -and
+        $windowPersistence.delta.top -le $positionTolerance -and
+        $windowPersistence.delta.width -le $sizeTolerance -and
+        $windowPersistence.delta.height -le $sizeTolerance
+    )
+    $windowPersistence | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $uiEvidenceDir 'window-persistence.json') -Encoding utf8
+    if (-not $windowPersistence.pass) {
+        throw "Packaged editor window geometry was not restored after a normal restart: $($windowPersistence | ConvertTo-Json -Depth 10 -Compress)"
+    }
+    Write-Host "Window persistence PASS: before=$($boundsBeforeClose.width)x$($boundsBeforeClose.height)@$($boundsBeforeClose.left),$($boundsBeforeClose.top) after=$($boundsAfterRestart.width)x$($boundsAfterRestart.height)@$($boundsAfterRestart.left),$($boundsAfterRestart.top)."
+
     $stage = 'project_load'
     $project = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $projectPath
     Write-Host "Project load PASS: $($project.path), duration=$($project.duration_frames) frames."
