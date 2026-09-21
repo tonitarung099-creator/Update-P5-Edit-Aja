@@ -20,6 +20,10 @@ class BuildUiPersistenceTests(unittest.TestCase):
             "function Close-SmokeWindowGracefully",
             "0x0010",
             "WM_CLOSE",
+            "FindBestTopLevelWindow",
+            "EnumWindows(",
+            "GetWindowTextLength",
+            "largest_visible_titled_top_level_window",
         ):
             self.assertIn(marker, self.support)
 
@@ -32,6 +36,11 @@ class BuildUiPersistenceTests(unittest.TestCase):
         self.assertIn("Close-SmokeWindowGracefully -Process $appProcess", self.functional)
         self.assertIn("Start-Process -FilePath $app", self.functional)
         self.assertIn("window-persistence.json", self.functional)
+        restart_bridge = self.functional.index("$discovery = Wait-AgentBridge -DiscoveryFile $discoveryPath", persistence)
+        reopened_project = self.functional.index("$project = Wait-ProjectLoaded", restart_bridge)
+        after_bounds = self.functional.index("$boundsAfterRestart = Get-SmokeWindowBounds", reopened_project)
+        self.assertLess(restart_bridge, reopened_project)
+        self.assertLess(reopened_project, after_bounds)
 
     def test_persistence_is_measured_with_bounded_tolerance(self):
         for marker in (

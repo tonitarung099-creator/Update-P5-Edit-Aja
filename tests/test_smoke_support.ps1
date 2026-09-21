@@ -11,6 +11,9 @@ try {
     foreach ($name in @('Get-SmokeWindowBounds', 'Set-SmokeWindowBounds', 'Close-SmokeWindowGracefully')) {
         if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Missing UI persistence helper: $name" }
     }
+    if (-not ('P5SmokeUiNative' -as [type]).GetMethod('FindBestTopLevelWindow')) {
+        throw 'Windows UI evidence helper is missing robust top-level window selection.'
+    }
     Assert-SmokeProcessRunning -Process (Get-Process -Id $PID) -Stage 'running fixture'
     $pwsh = (Get-Process -Id $PID).Path
     $exited = Start-Process -FilePath $pwsh -ArgumentList @('-NoProfile', '-Command', 'exit 7') -PassThru -Wait

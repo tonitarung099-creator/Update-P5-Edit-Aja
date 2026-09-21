@@ -230,6 +230,10 @@ try {
     $baseUrl = "$($discovery.rest_base_url)"
     $token = "$($discovery.token)"
 
+    # The REST bridge can become ready before the fully restored editor window
+    # replaces transient startup/render windows. Wait for the reopened project
+    # to be visible through the native registry before measuring geometry.
+    $project = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $projectPath
     $boundsAfterRestart = Get-SmokeWindowBounds -Process $appProcess
     $afterRestartScreenshot = Save-SmokeWindowScreenshot -Process $appProcess -Path (Join-Path $uiEvidenceDir 'window-after-restart.png')
     $sizeTolerance = 48
@@ -267,8 +271,7 @@ try {
     Write-Host "Window persistence PASS: before=$($boundsBeforeClose.width)x$($boundsBeforeClose.height)@$($boundsBeforeClose.left),$($boundsBeforeClose.top) after=$($boundsAfterRestart.width)x$($boundsAfterRestart.height)@$($boundsAfterRestart.left),$($boundsAfterRestart.top)."
 
     $stage = 'project_load'
-    $project = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $projectPath
-    Write-Host "Project load PASS: $($project.path), duration=$($project.duration_frames) frames."
+    Write-Host "Project load PASS after restart: $($project.path), duration=$($project.duration_frames) frames."
 
     $stage = 'timeline_split'
     $before = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_timeline_state' -Arguments @{ include_items = $true }

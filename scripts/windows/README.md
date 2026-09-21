@@ -284,9 +284,19 @@ repeated samples above 500 ms fail that smoke stage.
 The functional smoke also verifies one concrete persistence boundary before
 editing the project: it moves the packaged window to a deterministic test
 geometry, closes the application through the normal WM_CLOSE path, relaunches
-the same portable executable, and compares the restored window position and
-size within bounded pixel tolerances. It stores before/after screenshots plus
+the same portable executable, waits for the reopened project to become ready,
+and compares the restored window position and size within bounded pixel
+tolerances. Window selection enumerates visible top-level windows owned by the
+editor process and prefers the largest titled window, avoiding transient Qt/QML
+render or startup windows. It stores before/after screenshots plus
 `window-persistence.json` in the same UI diagnostics directory.
+
+Build #88 proved why this selection matters: compilation, portable packaging,
+startup, AI Agent panel opening, screenshot capture and idle heartbeat all
+passed, but the first restart probe captured an untitled 416x208 internal
+window instead of the titled editor window. The regression fix keeps the same
+geometry tolerances; it corrects the measured window rather than weakening the
+acceptance boundary.
 
 This evidence is still deliberately narrow. It proves one normal window-geometry
 restart on the hosted Windows runner; it does not prove the full DPI matrix,
