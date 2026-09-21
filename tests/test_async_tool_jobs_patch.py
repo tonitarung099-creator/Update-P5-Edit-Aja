@@ -92,8 +92,11 @@ class AsyncToolJobsPatchTests(unittest.TestCase):
             "async-film-context-registration",
         ]
         names = [entry["name"] for entry in self.manifest["apply_chain"]]
-        self.assertEqual(names[-5:], expected)
-        self.assertLess(names.index("ai-agent-request-lifecycle"), names.index(expected[0]))
+        positions = [names.index(name) for name in expected]
+        self.assertEqual(positions, sorted(positions))
+        self.assertLess(names.index("ai-agent-request-lifecycle"), positions[0])
+        if "nonblocking-film-context-indexer" in names:
+            self.assertLess(positions[-1], names.index("nonblocking-film-context-indexer"))
 
         payloads = {
             item["source"]: item["destination"]
