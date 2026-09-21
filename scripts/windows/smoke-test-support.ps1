@@ -171,6 +171,72 @@ public static class P5SmokeUiNative
         int height,
         bool repaint
     );
+
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern int GetWindowTextLength(IntPtr hWnd);
+
+    public static IntPtr FindBestTopLevelWindow(int processId)
+    {
+        IntPtr bestTitled = IntPtr.Zero;
+        long bestTitledArea = 0;
+        IntPtr bestAny = IntPtr.Zero;
+        long bestAnyArea = 0;
+
+        EnumWindows((hWnd, lParam) =>
+        {
+            if (!IsWindowVisible(hWnd)) return true;
+
+            uint ownerProcessId;
+            GetWindowThreadProcessId(hWnd, out ownerProcessId);
+            if (ownerProcessId != (uint)processId) return true;
+
+            RECT rect;
+            if (!GetWindowRect(hWnd, out rect)) return true;
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+            if (width < 200 || height < 120) return true;
+
+            long area = (long)width * height;
+            if (area > bestAnyArea)
+            {
+                bestAny = hWnd;
+                bestAnyArea = area;
+            }
+
+            if (GetWindowTextLength(hWnd) > 0 && area > bestTitledArea)
+            {
+                bestTitled = hWnd;
+                bestTitledArea = area;
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        return bestTitled != IntPtr.Zero ? bestTitled : bestAny;
+    }
+
+    public static string GetWindowTitle(IntPtr hWnd)
+    {
+        int length = GetWindowTextLength(hWnd);
+        if (length <= 0) return String.Empty;
+        var text = new System.Text.StringBuilder(length + 1);
+        GetWindowText(hWnd, text, text.Capacity);
+        return text.ToString();
+    }
 }
 '@
     }
@@ -183,21 +249,19 @@ function Wait-SmokeMainWindow {
         [int]$TimeoutSeconds = 60
     )
 
+    Initialize-SmokeUiNative
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
         Assert-SmokeProcessRunning -Process $Process -Stage 'ui_evidence'
-        $Process.Refresh()
-        if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
-            try { [void]$Process.WaitForInputIdle(5000) } catch {}
-            $Process.Refresh()
-            if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
-                return $Process.MainWindowHandle
-            }
+        try { [void]$Process.WaitForInputIdle(1000) } catch {}
+        $handle = [P5SmokeUiNative]::FindBestTopLevelWindow($Process.Id)
+        if ($handle -ne [IntPtr]::Zero) {
+            return $handle
         }
         Start-Sleep -Milliseconds 250
     }
 
-    throw "Packaged application did not expose a main window within $TimeoutSeconds seconds."
+    throw "Packaged application did not expose a visible top-level main window within $TimeoutSeconds seconds."
 }
 
 function Get-SmokeWindowBounds {
@@ -230,6 +294,7 @@ function Get-SmokeWindowBounds {
         height = [int]$height
         dpi = [int]$dpi
         scale_percent = [Math]::Round(($dpi / 96.0) * 100)
+        title = [P5SmokeUiNative]::GetWindowTitle($handle)
     }
 }
 
@@ -354,6 +419,8 @@ function Save-SmokeWindowScreenshot {
         height = $height
         dpi = [int]$dpi
         scale_percent = [Math]::Round(($dpi / 96.0) * 100)
+        title = [P5SmokeUiNative]::GetWindowTitle($handle)
+        selection = 'largest_visible_titled_top_level_window'
         capture_method = $captureMethod
     }
 }
