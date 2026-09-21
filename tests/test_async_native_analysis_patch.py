@@ -104,8 +104,11 @@ class AsyncNativeAnalysisPatchTests(unittest.TestCase):
             "async-agent-clients",
         ]
         names = [entry["name"] for entry in self.manifest["apply_chain"]]
-        self.assertEqual(names[-5:], expected)
-        self.assertLess(names.index("nonblocking-film-context-indexer"), names.index(expected[0]))
+        positions = [names.index(name) for name in expected]
+        self.assertEqual(positions, sorted(positions))
+        self.assertLess(names.index("nonblocking-film-context-indexer"), positions[0])
+        if "agent-request-timeout" in names:
+            self.assertLess(positions[-1], names.index("agent-request-timeout"))
 
         payloads = {
             item["source"]: item["destination"]

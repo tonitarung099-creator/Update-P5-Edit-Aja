@@ -1,0 +1,117 @@
+--- a/src/aiassistant/openaicompatibleagent.h
++++ b/src/aiassistant/openaicompatibleagent.h
+@@ -14,6 +14,7 @@
+ 
+ class AgentToolRegistry;
+ class QNetworkAccessManager;
++class QTimer;
+ 
+ /**
+  * @brief Minimal OpenAI-compatible function-calling client.
+@@ -29,6 +30,7 @@
+     explicit OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent = nullptr);
+ 
+     void configure(const QString &chatCompletionsUrl, const QString &model, const QString &apiKey);
++    void setRequestTimeoutMs(int timeoutMs);
+     void run(const QString &prompt, bool fullToolAccess = true, int maxRounds = 32, bool attachToolImages = false);
+     void cancel();
+ 
+@@ -44,10 +46,12 @@
+     void processNextToolCall();
+     void appendToolResult(const QJsonObject &call, const QJsonObject &result);
+     void clearPendingToolState();
++    void handleRequestTimeout();
+     void fail(const QString &message);
+ 
+     AgentToolRegistry *m_registry{nullptr};
+     QNetworkAccessManager *m_network{nullptr};
++    QTimer *m_requestTimer{nullptr};
+     QPointer<QNetworkReply> m_reply;
+     QString m_toolJobId;
+     QJsonArray m_pendingToolCalls;
+@@ -60,4 +64,5 @@
+     bool m_attachToolImages{false};
+     int m_round{0};
+     int m_maxRounds{32};
++    int m_requestTimeoutMs{600000};
+ };
+--- a/src/aiassistant/openaicompatibleagent.cpp
++++ b/src/aiassistant/openaicompatibleagent.cpp
+@@ -14,13 +14,17 @@
+ #include <QNetworkAccessManager>
+ #include <QNetworkReply>
+ #include <QNetworkRequest>
++#include <QTimer>
+ #include <QUrl>
+ 
+ OpenAiCompatibleAgent::OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent)
+     : QObject(parent)
+     , m_registry(registry)
+     , m_network(new QNetworkAccessManager(this))
++    , m_requestTimer(new QTimer(this))
+ {
++    m_requestTimer->setSingleShot(true);
++    connect(m_requestTimer, &QTimer::timeout, this, &OpenAiCompatibleAgent::handleRequestTimeout);
+     if (m_registry) {
+         connect(m_registry, &AgentToolRegistry::jobFinished, this, [this](const QString &jobId, const QJsonObject &result) {
+             if (jobId != m_toolJobId || m_pendingToolIndex < 0 || m_pendingToolIndex >= m_pendingToolCalls.size()) {
+@@ -41,6 +45,11 @@
+     m_apiKey = apiKey;
+ }
+ 
++void OpenAiCompatibleAgent::setRequestTimeoutMs(int timeoutMs)
++{
++    m_requestTimeoutMs = qBound(10, timeoutMs, 60 * 60 * 1000);
++}
++
+ void OpenAiCompatibleAgent::run(const QString &prompt, bool fullToolAccess, int maxRounds, bool attachToolImages)
+ {
+     if (m_reply || !m_toolJobId.isEmpty()) {
+@@ -88,6 +97,7 @@
+     // cannot report a cancellation as an API error or alter a later run.
+     QNetworkReply *reply = m_reply.data();
+     m_reply.clear();
++    m_requestTimer->stop();
+     if (reply) {
+         reply->abort();
+     }
+@@ -117,11 +127,13 @@
+ 
+     QNetworkReply *reply = m_network->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+     m_reply = reply;
++    m_requestTimer->start(m_requestTimeoutMs);
+     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+         if (m_reply != reply) {
+             reply->deleteLater();
+             return;
+         }
++        m_requestTimer->stop();
+         m_reply.clear();
+         handleReply(reply);
+         reply->deleteLater();
+@@ -283,8 +295,25 @@
+     m_pendingToolIndex = 0;
+ }
+ 
++void OpenAiCompatibleAgent::handleRequestTimeout()
++{
++    QNetworkReply *reply = m_reply.data();
++    if (!reply) {
++        return;
++    }
++
++    // Detach before abort() because finished may be emitted synchronously.
++    // The stale callback will only delete the old reply and cannot report a
++    // second failure or alter a later request.
++    m_reply.clear();
++    reply->abort();
++    fail(QStringLiteral("API request timed out after %1 seconds. You can increase the timeout in API settings for slower local models.")
++             .arg(m_requestTimeoutMs / 1000.0, 0, 'f', 1));
++}
++
+ void OpenAiCompatibleAgent::fail(const QString &message)
+ {
++    m_requestTimer->stop();
+     clearPendingToolState();
+     Q_EMIT busyChanged(false);
+     Q_EMIT failed(message);

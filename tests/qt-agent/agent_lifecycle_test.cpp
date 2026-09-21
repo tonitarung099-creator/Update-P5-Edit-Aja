@@ -8,6 +8,7 @@
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTimer>
 #include <QtTest>
 
 // Real local HTTP, no credentials or remote API. Hold replies until the test
@@ -112,6 +113,61 @@ private Q_SLOTS:
         QTRY_COMPARE(failed.size(), 1);
         QVERIFY(!busy.last().at(0).toBool());
         QVERIFY(failed.at(0).at(0).toString().contains(QStringLiteral("invalid JSON")));
+    }
+    void stalledApiRequestTimesOutAndNextRunSucceeds()
+    {
+        HttpFixture http;
+        QVERIFY(http.server.listen(QHostAddress::LocalHost, 0));
+        AgentToolRegistry registry;
+        OpenAiCompatibleAgent agent(&registry);
+        agent.configure(http.url(), QStringLiteral("fixture"), {});
+        agent.setRequestTimeoutMs(80);
+
+        QSignalSpy busy(&agent, &OpenAiCompatibleAgent::busyChanged);
+        QSignalSpy failed(&agent, &OpenAiCompatibleAgent::failed);
+        QSignalSpy finished(&agent, &OpenAiCompatibleAgent::finished);
+
+        agent.run(QStringLiteral("never respond"), false);
+        QTRY_COMPARE(http.requests.size(), 1);
+        QTRY_COMPARE(failed.size(), 1);
+        QVERIFY(failed.at(0).at(0).toString().contains(QStringLiteral("timed out")));
+        QVERIFY(!busy.last().at(0).toBool());
+        QCOMPARE(finished.size(), 0);
+
+        // The aborted reply may finish after the timeout. It must be stale and
+        // must not emit a second failure or change the next request's state.
+        QTest::qWait(120);
+        QCOMPARE(failed.size(), 1);
+
+        agent.setRequestTimeoutMs(1000);
+        agent.run(QStringLiteral("fresh after timeout"), false);
+        QTRY_COMPARE(http.requests.size(), 2);
+        QVERIFY(busy.last().at(0).toBool());
+        http.respond(1, R"json({"choices":[{"message":{"role":"assistant","content":"fresh after timeout completed"}}]})json");
+        QTRY_COMPARE(finished.size(), 1);
+        QCOMPARE(finished.at(0).at(0).toString(), QStringLiteral("fresh after timeout completed"));
+        QCOMPARE(failed.size(), 1);
+        QVERIFY(!busy.last().at(0).toBool());
+    }
+
+    void cancelStopsPendingRequestTimeout()
+    {
+        HttpFixture http;
+        QVERIFY(http.server.listen(QHostAddress::LocalHost, 0));
+        AgentToolRegistry registry;
+        OpenAiCompatibleAgent agent(&registry);
+        agent.configure(http.url(), QStringLiteral("fixture"), {});
+        agent.setRequestTimeoutMs(80);
+
+        QSignalSpy busy(&agent, &OpenAiCompatibleAgent::busyChanged);
+        QSignalSpy failed(&agent, &OpenAiCompatibleAgent::failed);
+        agent.run(QStringLiteral("cancel before timeout"), false);
+        QTRY_COMPARE(http.requests.size(), 1);
+        agent.cancel();
+        QTest::qWait(140);
+
+        QCOMPARE(failed.size(), 0);
+        QVERIFY(!busy.last().at(0).toBool());
     }
     void asyncToolKeepsEventLoopResponsiveAndCompletesAgent()
     {
