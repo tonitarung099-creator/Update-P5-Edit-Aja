@@ -39,8 +39,9 @@ class NonblockingFilmContextIndexerPatchTests(unittest.TestCase):
         )
         self.assertEqual(removed.count("waitForStarted(3000)"), 2)
 
-    def test_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
+    def test_patch_precedes_native_async_analysis_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        entry = self.manifest["apply_chain"][names.index("nonblocking-film-context-indexer")]
         self.assertEqual(entry["name"], "nonblocking-film-context-indexer")
         self.assertEqual(entry["path"], "patches/nonblocking-film-context-indexer.patch")
         self.assertTrue(entry["check"])
@@ -56,7 +57,12 @@ class NonblockingFilmContextIndexerPatchTests(unittest.TestCase):
         )
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("nonblocking-film-context-indexer.patch", 1)]'))
+        self.assertIn('("nonblocking-film-context-indexer.patch", 1)', chain)
+        if '("async-native-analysis-registry.patch", 1)' in chain:
+            self.assertLess(
+                chain.index('("nonblocking-film-context-indexer.patch", 1)'),
+                chain.index('("async-native-analysis-registry.patch", 1)'),
+            )
 
 
 if __name__ == "__main__":
