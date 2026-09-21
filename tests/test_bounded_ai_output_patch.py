@@ -61,7 +61,13 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
         )
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("bounded-ai-output.patch", 1)]'))
+        self.assertIn('("bounded-ai-output.patch", 1)', chain)
+        if "gemini-only-key-pool" in names:
+            self.assertLess(bounded_index, names.index("gemini-only-key-pool"))
+            self.assertLess(
+                chain.index('("bounded-ai-output.patch", 1)'),
+                chain.index('("gemini-only-key-pool.patch", 1)'),
+            )
 
 
 if __name__ == "__main__":
