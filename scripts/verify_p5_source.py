@@ -29,7 +29,7 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r'm_aiAssistantDock = addDock\(i18n\("AI Agent"\)', "AI Agent right-sidebar dock"),
     ("src/mainwindow.cpp", r"Keep AI Agent as the primary right sidebar", "AI Agent post-layout docking"),
     ("src/aiassistant/aiassistantwidget.cpp", r"aiAssistantScrollArea", "Scrollable AI Agent sidebar"),
-    ("src/aiassistant/aiassistantwidget.cpp", r"AI Agent — Main Control", "AI Agent primary command surface"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"aiAgentMainControl", "AI Agent primary command surface"),
     ("src/mainwindow.cpp", r"creatorAiAgentButton", "Filmora-style primary AI Agent workspace button"),
     ("src/mainwindow.cpp", r"Qt::ToolButtonTextUnderIcon", "Filmora-style Creator Workspace category layout"),
     ("src/mainwindow.cpp", r"Quick Edit: potong 5", "Creator Workspace Quick Edit command surface"),
@@ -67,6 +67,7 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"setMaximumBlockCount\(120\)", "Bounded Local Edit history block count"),
     ("src/aiassistant/aiassistantwidget.cpp", r"generativelanguage\.googleapis\.com/v1beta/openai/chat/completions", "Gemini-only API endpoint"),
     ("src/aiassistant/aiassistantwidget.cpp", r"geminiApiKeyPool", "Gemini API key pool editor"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"Built-in AI Agent uses Google Gemini only", "Gemini-only primary agent copy"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"keys\.size\(\) >= 100", "Gemini API key pool cap"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"httpStatus == 429", "Gemini rate-limit rotation trigger"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"Retry-After", "Gemini key cooldown header"),
@@ -92,6 +93,7 @@ REQUIRED_FILES = [
 
 
 FORBIDDEN_PATTERNS = [
+    ("src/aiassistant/aiassistantwidget.cpp", r"Connect an OpenAI-compatible API inside the editor", "Legacy OpenAI-compatible primary panel copy remains"),
     ("src/mainwindow.cpp", r"waitForStarted|waitForFinished|waitForReadyRead", "Blocking QProcess wait remains in MainWindow AI tool bridge"),
 ]
 
