@@ -8,6 +8,9 @@ New-Item -ItemType Directory $root | Out-Null
 try {
     Initialize-SmokeUiNative
     if (-not ('P5SmokeUiNative' -as [type])) { throw 'Windows UI evidence native helper did not load.' }
+    foreach ($name in @('Get-SmokeWindowBounds', 'Set-SmokeWindowBounds', 'Close-SmokeWindowGracefully')) {
+        if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Missing UI persistence helper: $name" }
+    }
     Assert-SmokeProcessRunning -Process (Get-Process -Id $PID) -Stage 'running fixture'
     $pwsh = (Get-Process -Id $PID).Path
     $exited = Start-Process -FilePath $pwsh -ArgumentList @('-NoProfile', '-Command', 'exit 7') -PassThru -Wait
