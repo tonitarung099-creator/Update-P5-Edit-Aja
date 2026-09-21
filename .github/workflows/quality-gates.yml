@@ -61,6 +61,7 @@ jobs:
               tests.test_creator_workspace_filmora_patch
               tests.test_ai_agent_toolbox_patch
               tests.test_creator_layout_filmora_patch
+              tests.test_creator_layout_reset_patch
               tests.test_keyframe_api_compile_fix
               tests.test_phase_integration
               tests.test_workflow_presets
