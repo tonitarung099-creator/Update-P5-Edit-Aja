@@ -6,6 +6,8 @@ $PSNativeCommandUseErrorActionPreference = $true
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
 New-Item -ItemType Directory $root | Out-Null
 try {
+    Initialize-SmokeUiNative
+    if (-not ('P5SmokeUiNative' -as [type])) { throw 'Windows UI evidence native helper did not load.' }
     Assert-SmokeProcessRunning -Process (Get-Process -Id $PID) -Stage 'running fixture'
     $pwsh = (Get-Process -Id $PID).Path
     $exited = Start-Process -FilePath $pwsh -ArgumentList @('-NoProfile', '-Command', 'exit 7') -PassThru -Wait
