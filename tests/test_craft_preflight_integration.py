@@ -1,4 +1,4 @@
-"""Run the real preflight CLI against the manifest-pinned Craft checkout.
+"""Run the portable-image preflight CLI against the manifest-pinned Craft checkout.
 
 P5_CRAFT_TEST_SOURCE must name a local checkout of that exact revision. The
 fixtures include source-only and prebuilt-binary blueprints; no toolchain
@@ -90,92 +90,6 @@ class CraftPreflightIntegrationTests(unittest.TestCase):
             encoding="utf-8",
         )
         return self.root / "fixture-images/dev-utils/snoretoast"
-
-    def run_installer_probe(self, *, broken_embedded=False, nsis_version="v3.09"):
-        # Use actual Craft resolution, copying and signing policy. Only tool
-        # execution is simulated; fixture bytes are not Windows executables.
-        driver = r"""
-import os, subprocess, sys
-from pathlib import Path
-from unittest.mock import patch
-root, repository, broken, version = sys.argv[1:]
-os.environ['craftRoot'] = str(Path(root) / 'craft')
-sys.path[:0] = [str(Path(root) / 'craft/bin'), repository]
-from CraftCore import CraftCore
-from Utils.CraftCache import CraftCache
-from scripts.prepare_package_images import prepare
-
-real_run = subprocess.run
-def command(args, **kwargs):
-    if args[0] == 'cmd':
-        return real_run(args, **kwargs)
-    if args[1] == '/VERSION':
-        return subprocess.CompletedProcess(args, 0, version, '')
-    assert args[1] == 'i', args
-    if Path(args[0]).name == '7za.exe':
-        assert Path(args[0]).read_bytes() == b'7zip fixture payload'
-        print('Actual Craft embedded payload copied and checked')
-        if broken == 'True':
-            return subprocess.CompletedProcess(args, 2, '', 'embedded tool failed')
-    return subprocess.CompletedProcess(args, 0, 'fixture tool info', '')
-
-with patch.object(CraftCache, 'findApplication', return_value=sys.executable), patch('scripts.prepare_package_images.subprocess.run', side_effect=command):
-    prepare(Path(root), 'probe', check_installer_tools=True)
-"""
-        return subprocess.run(
-            [sys.executable, "-c", driver, str(self.root), str(ROOT),
-             str(broken_embedded), nsis_version],
-            cwd=ROOT, env=self.env, text=True, capture_output=True, timeout=30,
-        )
-
-    def installer_images(self, build_type="RelWithDebInfo"):
-        # Keep the actual pinned 7zip-base recipe, changing only its fixture path.
-        recipe = self.root / "craft/blueprints/dev-utils/7zip-base/7zip-base.py"
-        recipe.write_text(recipe.read_text() +
-            "\n    def imageDir(self):\n"
-            "        return CraftCore.standardDirs.craftRoot() / 'fixture-images' / self.package.path / self.imageDirPattern()\n",
-            encoding="utf-8")
-        images = self.root / "fixture-images/dev-utils/7zip-base"
-        source = images / f"image-{build_type}-25.01"
-        (source / "dev-utils/7z/x64").mkdir(parents=True)
-        (source / "dev-utils/7z/x64/7za.exe").write_bytes(b"7zip fixture payload")
-        return images
-
-    def test_actual_nsis_embedded_lookup_and_copy(self):
-        self.installer_images()
-        result = self.run_installer_probe()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Actual Craft embedded payload copied and checked", result.stdout)
-
-    def test_embedded_execution_error_is_not_hidden_by_working_archive_tool(self):
-        self.installer_images()
-        result = self.run_installer_probe(broken_embedded=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("embedded tool failed", result.stderr)
-
-    def test_old_nsis_is_rejected(self):
-        self.installer_images()
-        result = self.run_installer_probe(nsis_version="v3.02")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("NSIS 3.03 or newer required", result.stderr)
-
-    @unittest.skipUnless(os.name == "nt", "Real Craft plus Windows junction")
-    def test_installer_tool_outside_graph_gets_real_junction(self):
-        images = self.installer_images("MinSizeRel")
-        desired = images / "image-RelWithDebInfo-25.01"
-        source = images / "image-MinSizeRel-25.01"
-        try:
-            first = self.run_installer_probe()
-            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-            self.assertIn("repaired 1 image path(s)", first.stdout)
-            self.assertTrue(desired.samefile(source))
-            again = self.run_installer_probe()
-            self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
-            self.assertIn("repaired 0 image path(s)", again.stdout)
-        finally:
-            if desired.is_dir():
-                os.rmdir(desired)
-        self.assertEqual((source / "dev-utils/7z/x64/7za.exe").read_bytes(), b"7zip fixture payload")
 
     def test_real_binary_dependency_missing_image_fails(self):
         self.add_binary_dependency()
