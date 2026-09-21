@@ -1,0 +1,78 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -41,6 +41,7 @@
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
++#include <QTextDocument>
+ #include <QTimer>
+ #include <QToolBox>
+ #include <QStringList>
+@@ -48,6 +49,31 @@
+ #include <QVector>
+ 
+ namespace {
++QString boundedUiPlainText(const QString &text, qsizetype maxChars)
++{
++    if (text.size() <= maxChars) {
++        return text;
++    }
++    return text.left(maxChars) + QStringLiteral(" … [display truncated]");
++}
++
++QString boundedTraceHtml(const QString &html)
++{
++    constexpr qsizetype maxTraceChars = 32768;
++    if (html.size() <= maxTraceChars) {
++        return html;
++    }
++
++    // Trace strings are trusted UI markup around escaped payloads. For a very
++    // large entry, parse only the bounded prefix and flatten it to escaped text
++    // so truncation cannot leave an unterminated tag/entity or create markup.
++    QTextDocument prefixDocument;
++    prefixDocument.setHtml(html.left(maxTraceChars));
++    const QString plainPrefix = prefixDocument.toPlainText();
++    return QStringLiteral("%1<br><i>%2</i>")
++        .arg(plainPrefix.toHtmlEscaped(), i18n("Display truncated to keep the AI sidebar responsive."));
++}
++
+ void stopOwnedProcessTree(QProcess *process)
+ {
+     if (!process || process->state() == QProcess::NotRunning) {
+@@ -381,6 +407,7 @@
+     m_localEditHistory->setObjectName(QStringLiteral("localEditHistory"));
+     m_localEditHistory->setMaximumHeight(135);
+     m_localEditHistory->setPlaceholderText(i18n("Applied Local Edit jobs will appear here."));
++    m_localEditHistory->document()->setMaximumBlockCount(160);
+ 
+     localEditLayout->addWidget(m_localEditInput, 1, 0);
+     localEditLayout->addWidget(m_localEditPreviewButton, 1, 1);
+@@ -628,6 +655,7 @@
+     m_output->setOpenExternalLinks(false);
+     m_output->setMinimumHeight(220);
+     m_output->setPlaceholderText(i18n("Agent tool calls and results will appear here."));
++    m_output->document()->setMaximumBlockCount(400);
+     agentLayout->addWidget(m_output, 3, 0, 1, 2);
+ 
+     layout->addWidget(agentGroup);
+@@ -702,8 +730,8 @@
+     const QString route = result.value(QStringLiteral("route")).toString(QStringLiteral("local")).toUpper().toHtmlEscaped();
+     const bool applied = result.value(QStringLiteral("applied")).toBool();
+     const QString state = applied ? QStringLiteral("✓") : QStringLiteral("•");
+-    const QString safeCommand = command.trimmed().toHtmlEscaped();
+-    const QString safeMessage = result.value(QStringLiteral("message")).toString().toHtmlEscaped();
++    const QString safeCommand = boundedUiPlainText(command.trimmed(), 2048).toHtmlEscaped();
++    const QString safeMessage = boundedUiPlainText(result.value(QStringLiteral("message")).toString(), 4096).toHtmlEscaped();
+     m_localEditHistory->append(QStringLiteral("<b>%1 %2 · %3</b> — %4<br><span style='opacity:0.8'>%5</span>")
+                                    .arg(state)
+                                    .arg(when.toHtmlEscaped())
+@@ -2493,7 +2521,7 @@
+ 
+ void AiAssistantWidget::appendTrace(const QString &text)
+ {
+-    m_output->append(QStringLiteral("<p>%1</p>").arg(text));
++    m_output->append(QStringLiteral("<p>%1</p>").arg(boundedTraceHtml(text)));
+ }
+ 
+ void AiAssistantWidget::setBusy(bool busy)
