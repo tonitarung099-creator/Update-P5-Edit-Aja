@@ -1,0 +1,35 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -38,6 +38,7 @@
+ #include <QScrollArea>
+ #include <QSizePolicy>
+ #include <QSet>
++#include <QSpinBox>
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
+@@ -573,3 +574,14 @@
+     apiForm->addRow(i18n("API key"), m_apiKey);
+ 
++    auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
++    requestTimeoutSeconds->setObjectName(QStringLiteral("agentRequestTimeoutSeconds"));
++    requestTimeoutSeconds->setRange(15, 3600);
++    requestTimeoutSeconds->setValue(qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600));
++    requestTimeoutSeconds->setSuffix(i18n(" s"));
++    requestTimeoutSeconds->setToolTip(i18n("Maximum wait for each API model response. Increase this for slower local models. Tool jobs have their own cancellation and deadline rules."));
++    apiForm->addRow(i18n("Request timeout"), requestTimeoutSeconds);
++    connect(requestTimeoutSeconds, qOverload<int>(&QSpinBox::valueChanged), this, [](int seconds) {
++        QSettings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent")).setValue(QStringLiteral("requestTimeoutSeconds"), seconds);
++    });
++
+     m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
+@@ -1585,4 +1598,5 @@
+     QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
+     settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
+     settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
++    const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
+ 
+@@ -1598,2 +1612,3 @@
+     m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
++    m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000);
+     const int maxRounds = m_autonomousMode->isChecked() ? 96 : 32;
