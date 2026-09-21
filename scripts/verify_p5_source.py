@@ -61,6 +61,7 @@ TEXT_CHECKS = [
     ("tools/api/kdenlive_agent_api_example.py", r"/jobs/\{job_id\}", "REST example async job polling"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"handleRequestTimeout", "Bounded API request timeout handler"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"m_requestTimer->start\(m_requestTimeoutMs\)", "Per-turn API timeout start"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"requestTimeoutSeconds", "User-facing API request timeout setting"),
 ]
 
 
