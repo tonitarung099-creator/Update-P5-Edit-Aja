@@ -1,0 +1,246 @@
+--- a/src/aiassistant/agenttoolregistry.h
++++ b/src/aiassistant/agenttoolregistry.h
+@@ -6,6 +6,7 @@
+ 
+ #pragma once
+ 
++#include <QHash>
+ #include <QJsonArray>
+ #include <QJsonObject>
+ #include <QList>
+@@ -17,9 +18,9 @@
+ /**
+  * @brief Provider-neutral registry of editing tools exposed to every AI backend.
+  *
+- * The same registry is consumed by the built-in OpenAI-compatible API agent and
+- * by the local MCP bridge. Adding a tool here automatically makes it available
+- * to both paths.
++ * Normal native editor tools stay synchronous on the GUI thread. Process-backed
++ * tools may register an asynchronous handler; those return a job id immediately
++ * to REST/MCP callers while the built-in agent waits for the same job signal.
+  */
+ class AgentToolRegistry : public QObject
+ {
+@@ -27,21 +28,45 @@
+ 
+ public:
+     using Handler = std::function<QJsonObject(const QJsonObject &)>;
++    using Completion = std::function<void(const QJsonObject &)>;
++    using CancelHandler = std::function<void()>;
++    using AsyncHandler = std::function<CancelHandler(const QJsonObject &, Completion)>;
+ 
+     struct Tool {
+         QString name;
+         QString description;
+         QJsonObject inputSchema;
+         Handler handler;
++        AsyncHandler asyncHandler;
+     };
+ 
+     explicit AgentToolRegistry(QObject *parent = nullptr);
+ 
+     void registerTool(const QString &name, const QString &description, const QJsonObject &inputSchema, Handler handler);
++    void registerAsyncTool(const QString &name, const QString &description, const QJsonObject &inputSchema, AsyncHandler handler);
+     QJsonArray toolCatalog() const;
+     QJsonArray openAiToolCatalog() const;
++    bool isAsyncTool(const QString &name) const;
+     QJsonObject invoke(const QString &name, const QJsonObject &arguments) const;
++    QJsonObject invokeOrStart(const QString &name, const QJsonObject &arguments);
++    QJsonObject jobStatus(const QString &jobId) const;
++    QJsonObject cancelJob(const QString &jobId);
++
++Q_SIGNALS:
++    void jobFinished(const QString &jobId, const QJsonObject &result);
+ 
+ private:
++    struct Job {
++        QString status;
++        QJsonObject result;
++        CancelHandler cancel;
++    };
++
++    const Tool *findTool(const QString &name) const;
++    void completeJob(const QString &jobId, const QJsonObject &result);
++    void pruneJobs();
++
+     QList<Tool> m_tools;
++    QHash<QString, Job> m_jobs;
++    QList<QString> m_jobOrder;
+ };
+--- a/src/aiassistant/agenttoolregistry.cpp
++++ b/src/aiassistant/agenttoolregistry.cpp
+@@ -7,6 +7,7 @@
+ #include "agenttoolregistry.h"
+ 
+ #include <QJsonValue>
++#include <QUuid>
+ 
+ #include <utility>
+ 
+@@ -17,16 +18,25 @@
+ 
+ void AgentToolRegistry::registerTool(const QString &name, const QString &description, const QJsonObject &inputSchema, Handler handler)
+ {
+-    m_tools.push_back({name, description, inputSchema, std::move(handler)});
++    m_tools.push_back({name, description, inputSchema, std::move(handler), {}});
++}
++
++void AgentToolRegistry::registerAsyncTool(const QString &name, const QString &description, const QJsonObject &inputSchema, AsyncHandler handler)
++{
++    m_tools.push_back({name, description, inputSchema, {}, std::move(handler)});
+ }
+ 
+ QJsonArray AgentToolRegistry::toolCatalog() const
+ {
+     QJsonArray result;
+     for (const auto &tool : m_tools) {
+-        result.push_back(QJsonObject{{QStringLiteral("name"), tool.name},
+-                                     {QStringLiteral("description"), tool.description},
+-                                     {QStringLiteral("inputSchema"), tool.inputSchema}});
++        QJsonObject entry{{QStringLiteral("name"), tool.name},
++                          {QStringLiteral("description"), tool.description},
++                          {QStringLiteral("inputSchema"), tool.inputSchema}};
++        if (tool.asyncHandler) {
++            entry.insert(QStringLiteral("async"), true);
++        }
++        result.push_back(entry);
+     }
+     return result;
+ }
+@@ -43,15 +53,131 @@
+     return result;
+ }
+ 
+-QJsonObject AgentToolRegistry::invoke(const QString &name, const QJsonObject &arguments) const
++const AgentToolRegistry::Tool *AgentToolRegistry::findTool(const QString &name) const
+ {
+     for (const auto &tool : m_tools) {
+         if (tool.name == name) {
+-            if (!tool.handler) {
+-                return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Tool has no handler")}};
++            return &tool;
++        }
++    }
++    return nullptr;
++}
++
++bool AgentToolRegistry::isAsyncTool(const QString &name) const
++{
++    const Tool *tool = findTool(name);
++    return tool && static_cast<bool>(tool->asyncHandler);
++}
++
++QJsonObject AgentToolRegistry::invoke(const QString &name, const QJsonObject &arguments) const
++{
++    const Tool *tool = findTool(name);
++    if (!tool) {
++        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown tool: %1").arg(name)}};
++    }
++    if (tool->asyncHandler) {
++        return QJsonObject{{QStringLiteral("ok"), false},
++                           {QStringLiteral("async"), true},
++                           {QStringLiteral("error"), QStringLiteral("Tool requires asynchronous invocation")}};
++    }
++    if (!tool->handler) {
++        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Tool has no handler")}};
++    }
++    return tool->handler(arguments);
++}
++
++QJsonObject AgentToolRegistry::invokeOrStart(const QString &name, const QJsonObject &arguments)
++{
++    const Tool *tool = findTool(name);
++    if (!tool) {
++        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown tool: %1").arg(name)}};
++    }
++    if (!tool->asyncHandler) {
++        return invoke(name, arguments);
++    }
++
++    const QString jobId = QUuid::createUuid().toString(QUuid::WithoutBraces);
++    m_jobs.insert(jobId, Job{QStringLiteral("running"), {}, {}});
++    m_jobOrder.push_back(jobId);
++
++    CancelHandler cancel = tool->asyncHandler(arguments, [this, jobId](const QJsonObject &result) { completeJob(jobId, result); });
++    auto job = m_jobs.find(jobId);
++    if (job != m_jobs.end() && job->status == QLatin1String("running")) {
++        job->cancel = std::move(cancel);
++    }
++    pruneJobs();
++    return QJsonObject{{QStringLiteral("ok"), true},
++                       {QStringLiteral("async"), true},
++                       {QStringLiteral("job_id"), jobId},
++                       {QStringLiteral("status"), QStringLiteral("running")}};
++}
++
++QJsonObject AgentToolRegistry::jobStatus(const QString &jobId) const
++{
++    const auto job = m_jobs.constFind(jobId);
++    if (job == m_jobs.cend()) {
++        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown tool job: %1").arg(jobId)}};
++    }
++    QJsonObject response{{QStringLiteral("ok"), true},
++                         {QStringLiteral("async"), true},
++                         {QStringLiteral("job_id"), jobId},
++                         {QStringLiteral("status"), job->status}};
++    if (job->status != QLatin1String("running")) {
++        response.insert(QStringLiteral("result"), job->result);
++    }
++    return response;
++}
++
++QJsonObject AgentToolRegistry::cancelJob(const QString &jobId)
++{
++    auto job = m_jobs.find(jobId);
++    if (job == m_jobs.end()) {
++        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown tool job: %1").arg(jobId)}};
++    }
++    if (job->status != QLatin1String("running")) {
++        return jobStatus(jobId);
++    }
++
++    CancelHandler cancel = std::move(job->cancel);
++    job->status = QStringLiteral("cancelled");
++    job->result = QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Tool job cancelled.")}};
++    if (cancel) {
++        cancel();
++    }
++    Q_EMIT jobFinished(jobId, job->result);
++    pruneJobs();
++    return jobStatus(jobId);
++}
++
++void AgentToolRegistry::completeJob(const QString &jobId, const QJsonObject &result)
++{
++    auto job = m_jobs.find(jobId);
++    if (job == m_jobs.end() || job->status != QLatin1String("running")) {
++        return;
++    }
++    job->status = QStringLiteral("completed");
++    job->result = result;
++    job->cancel = {};
++    Q_EMIT jobFinished(jobId, result);
++    pruneJobs();
++}
++
++void AgentToolRegistry::pruneJobs()
++{
++    constexpr int maxRetainedJobs = 128;
++    while (m_jobOrder.size() > maxRetainedJobs) {
++        bool removed = false;
++        for (auto it = m_jobOrder.begin(); it != m_jobOrder.end(); ++it) {
++            const auto job = m_jobs.constFind(*it);
++            if (job == m_jobs.cend() || job->status != QLatin1String("running")) {
++                m_jobs.remove(*it);
++                m_jobOrder.erase(it);
++                removed = true;
++                break;
+             }
+-            return tool.handler(arguments);
++        }
++        if (!removed) {
++            break;
+         }
+     }
+-    return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown tool: %1").arg(name)}};
+ }
