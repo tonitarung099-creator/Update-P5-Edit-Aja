@@ -8,7 +8,7 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -565,4 +566,15 @@
+@@ -565,4 +566,16 @@
      m_attachVisionFrames->setChecked(false);
      m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next API turn. Leave this off for text-only models."));
      apiForm->addRow(QString(), m_attachVisionFrames);
