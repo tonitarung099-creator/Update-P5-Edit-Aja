@@ -19,6 +19,7 @@ $savedProjectPath = Join-Path $workRoot 'saved-copy.kdenlive'
 $discoveryPath = Join-Path $env:TEMP 'kdenlive-open-agent.json'
 
 $diagnostics = Join-Path (Get-Location) 'artifacts/smoke/functional'
+$uiEvidenceDir = Join-Path $diagnostics 'ui'
 $appStdout = Join-Path $env:RUNNER_TEMP 'editaja-functional-stdout.txt'
 $appStderr = Join-Path $env:RUNNER_TEMP 'editaja-functional-stderr.txt'
 $stage = 'extract'
@@ -195,6 +196,23 @@ try {
         throw "AI Agent panel open verification returned an unexpected result: $($openedPanel | ConvertTo-Json -Depth 20 -Compress)"
     }
     Write-Host 'AI Agent panel PASS: registered and openable through the live packaged editor.'
+
+
+    $stage = 'ui_evidence'
+    New-Item -ItemType Directory -Force $uiEvidenceDir | Out-Null
+    $screenshot = Save-SmokeWindowScreenshot -Process $appProcess -Path (Join-Path $uiEvidenceDir 'ai-agent-window.png')
+    $heartbeat = Measure-SmokeWindowHeartbeat -Process $appProcess
+    $uiEvidence = [ordered]@{
+        captured_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        scope = 'packaged portable editor with AI Agent panel open'
+        screenshot = $screenshot
+        heartbeat = $heartbeat
+    }
+    $uiEvidence | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $uiEvidenceDir 'ui-evidence.json') -Encoding utf8
+    if (-not $heartbeat.pass) {
+        throw "Packaged editor UI heartbeat did not meet the idle evidence threshold: $($heartbeat | ConvertTo-Json -Depth 8 -Compress)"
+    }
+    Write-Host "UI evidence PASS: screenshot=$($screenshot.width)x$($screenshot.height) dpi=$($screenshot.dpi), heartbeat avg=$($heartbeat.average_ms)ms max=$($heartbeat.max_ms)ms."
 
     $stage = 'project_load'
     $project = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $projectPath
