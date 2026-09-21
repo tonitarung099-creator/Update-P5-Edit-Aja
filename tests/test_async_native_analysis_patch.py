@@ -1,5 +1,8 @@
 import json
+import re
 import unittest
+
+from scripts.verify_p5_source import FORBIDDEN_PATTERNS, TEXT_CHECKS
 
 from tests.build_contract import ROOT
 
@@ -86,6 +89,11 @@ class AsyncNativeAnalysisPatchTests(unittest.TestCase):
             self.assertIn(marker, self.clients)
         self.assertIn('jobs/cancel', self.clients)
         self.assertIn('/jobs/{job_id}/cancel', self.clients)
+
+    def test_source_verifier_regexes_compile(self):
+        for _relative, pattern, label in [*TEXT_CHECKS, *FORBIDDEN_PATTERNS]:
+            with self.subTest(label=label):
+                re.compile(pattern)
 
     def test_patch_order_and_craft_payloads_match(self):
         expected = [
