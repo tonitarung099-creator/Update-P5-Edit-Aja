@@ -9,7 +9,7 @@
  #include <QJsonDocument>
  #include <QFile>
  #include <QFileInfo>
-@@ -14,8 +16,84 @@
+@@ -14,8 +16,89 @@
  #include <QNetworkAccessManager>
  #include <QNetworkReply>
  #include <QNetworkRequest>
@@ -99,7 +99,7 @@
  
  OpenAiCompatibleAgent::OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent)
      : QObject(parent)
-@@ -25,6 +103,7 @@
+@@ -25,6 +108,7 @@
  {
      m_requestTimer->setSingleShot(true);
      connect(m_requestTimer, &QTimer::timeout, this, &OpenAiCompatibleAgent::handleRequestTimeout);
@@ -107,7 +107,7 @@
      if (m_registry) {
          connect(m_registry, &AgentToolRegistry::jobFinished, this, [this](const QString &jobId, const QJsonObject &result) {
              if (jobId != m_toolJobId || m_pendingToolIndex < 0 || m_pendingToolIndex >= m_pendingToolCalls.size()) {
-@@ -42,7 +121,13 @@
+@@ -42,7 +126,13 @@
  {
      m_url = chatCompletionsUrl.trimmed();
      m_model = model.trimmed();
@@ -122,7 +122,7 @@
  }
  
  void OpenAiCompatibleAgent::setRequestTimeoutMs(int timeoutMs)
-@@ -60,6 +145,17 @@
+@@ -60,6 +150,17 @@
      if (m_url.isEmpty() || m_model.isEmpty()) {
          fail(QStringLiteral("Configure the API URL and model first."));
          return;
@@ -140,7 +140,7 @@
      }
  
      clearPendingToolState();
-@@ -106,7 +202,16 @@
+@@ -106,7 +207,16 @@
  
  void OpenAiCompatibleAgent::sendTurn()
  {
@@ -158,7 +158,7 @@
          fail(QStringLiteral("Agent stopped after %1 tool rounds to avoid an accidental loop.").arg(m_maxRounds));
          return;
      }
-@@ -121,11 +226,25 @@
+@@ -121,11 +231,25 @@
  
      QNetworkRequest request{QUrl(m_url)};
      request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
@@ -186,7 +186,7 @@
      m_reply = reply;
      m_requestTimer->start(m_requestTimeoutMs);
      connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-@@ -143,7 +262,45 @@
+@@ -143,7 +267,45 @@
  void OpenAiCompatibleAgent::handleReply(QNetworkReply *reply)
  {
      const QByteArray bytes = reply->readAll();
