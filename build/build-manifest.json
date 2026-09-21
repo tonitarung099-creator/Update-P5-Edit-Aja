@@ -170,6 +170,41 @@
       "path": "patches/ai-agent-request-lifecycle.patch",
       "strip": 1,
       "check": true
+    },
+    {
+      "name": "async-tool-registry",
+      "path": "patches/async-tool-registry.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-tool-ipc",
+      "path": "patches/async-tool-ipc.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-agent-tool-wait",
+      "path": "patches/async-agent-tool-wait.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-film-context-process",
+      "path": "patches/async-film-context-process.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-film-context-registration",
+      "path": "patches/async-film-context-registration.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -224,6 +259,26 @@
     {
       "source": "patches/ai-agent-request-lifecycle.patch",
       "destination": "craft/editaja/ai-agent-request-lifecycle.patch"
+    },
+    {
+      "source": "patches/async-tool-registry.patch",
+      "destination": "craft/editaja/async-tool-registry.patch"
+    },
+    {
+      "source": "patches/async-tool-ipc.patch",
+      "destination": "craft/editaja/async-tool-ipc.patch"
+    },
+    {
+      "source": "patches/async-agent-tool-wait.patch",
+      "destination": "craft/editaja/async-agent-tool-wait.patch"
+    },
+    {
+      "source": "patches/async-film-context-process.patch",
+      "destination": "craft/editaja/async-film-context-process.patch"
+    },
+    {
+      "source": "patches/async-film-context-registration.patch",
+      "destination": "craft/editaja/async-film-context-registration.patch"
     }
   ]
 }
