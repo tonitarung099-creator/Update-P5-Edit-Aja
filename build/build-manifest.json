@@ -212,6 +212,41 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "async-native-analysis-registry",
+      "path": "patches/async-native-analysis-registry.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-native-analysis-cleanup",
+      "path": "patches/async-native-analysis-cleanup.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-native-silence",
+      "path": "patches/async-native-silence.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-native-transcription",
+      "path": "patches/async-native-transcription.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
+    },
+    {
+      "name": "async-agent-clients",
+      "path": "patches/async-agent-clients.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -290,6 +325,26 @@
     {
       "source": "patches/nonblocking-film-context-indexer.patch",
       "destination": "craft/editaja/nonblocking-film-context-indexer.patch"
+    },
+    {
+      "source": "patches/async-native-analysis-registry.patch",
+      "destination": "craft/editaja/async-native-analysis-registry.patch"
+    },
+    {
+      "source": "patches/async-native-analysis-cleanup.patch",
+      "destination": "craft/editaja/async-native-analysis-cleanup.patch"
+    },
+    {
+      "source": "patches/async-native-silence.patch",
+      "destination": "craft/editaja/async-native-silence.patch"
+    },
+    {
+      "source": "patches/async-native-transcription.patch",
+      "destination": "craft/editaja/async-native-transcription.patch"
+    },
+    {
+      "source": "patches/async-agent-clients.patch",
+      "destination": "craft/editaja/async-agent-clients.patch"
     }
   ]
 }
