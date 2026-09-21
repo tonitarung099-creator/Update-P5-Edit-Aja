@@ -35,13 +35,24 @@ public:
         });
     }
     QString url() const { return QStringLiteral("http://127.0.0.1:%1/v1/chat/completions").arg(server.serverPort()); }
-    void respond(int index, const QByteArray &body)
+    void respondStatus(int index, int status, const QByteArray &reason, const QByteArray &body, const QByteArray &extraHeaders = {})
     {
         auto socket = requests.at(index);
         if (!socket || socket->state() != QAbstractSocket::ConnectedState) return;
-        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: "
-                      + QByteArray::number(body.size()) + "\r\n\r\n" + body);
+        socket->write("HTTP/1.1 " + QByteArray::number(status) + " " + reason + "\r\n"
+                      "Content-Type: application/json\r\nConnection: close\r\n"
+                      + extraHeaders
+                      + "Content-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body);
         socket->disconnectFromHost();
+    }
+    void respond(int index, const QByteArray &body)
+    {
+        respondStatus(index, 200, QByteArrayLiteral("OK"), body);
+    }
+    QByteArray requestData(int index) const
+    {
+        auto socket = requests.at(index);
+        return socket ? socket->property("request").toByteArray() : QByteArray{};
     }
 };
 
@@ -169,6 +180,51 @@ private Q_SLOTS:
         QCOMPARE(failed.size(), 0);
         QVERIFY(!busy.last().at(0).toBool());
     }
+    void geminiRateLimitRotatesToNextKey()
+    {
+        HttpFixture http;
+        QVERIFY(http.server.listen(QHostAddress::LocalHost, 0));
+        qputenv("P5_GEMINI_API_ENDPOINT_OVERRIDE", http.url().toUtf8());
+
+        AgentToolRegistry registry;
+        OpenAiCompatibleAgent agent(&registry);
+        agent.configure(http.url(), QStringLiteral("gemini-2.5-flash"), QStringLiteral("key-one\nkey-two"));
+
+        QSignalSpy trace(&agent, &OpenAiCompatibleAgent::trace);
+        QSignalSpy failed(&agent, &OpenAiCompatibleAgent::failed);
+        QSignalSpy finished(&agent, &OpenAiCompatibleAgent::finished);
+
+        agent.run(QStringLiteral("rotate on quota"), false);
+        QTRY_COMPARE(http.requests.size(), 1);
+        QTRY_VERIFY(http.requestData(0).toLower().contains("authorization: bearer key-one"));
+
+        http.respondStatus(
+            0,
+            429,
+            QByteArrayLiteral("Too Many Requests"),
+            R"json({"error":{"code":429,"status":"RESOURCE_EXHAUSTED","message":"quota exceeded"}})json",
+            QByteArrayLiteral("Retry-After: 60\r\n"));
+
+        QTRY_COMPARE(http.requests.size(), 2);
+        QTRY_VERIFY(http.requestData(1).toLower().contains("authorization: bearer key-two"));
+        QCOMPARE(failed.size(), 0);
+
+        bool sawRotation = false;
+        for (const auto &entry : trace) {
+            if (entry.at(0).toString().contains(QStringLiteral("switching automatically"))) {
+                sawRotation = true;
+                break;
+            }
+        }
+        QVERIFY(sawRotation);
+
+        http.respond(1, R"json({"choices":[{"message":{"role":"assistant","content":"rotated successfully"}}]})json");
+        QTRY_COMPARE(finished.size(), 1);
+        QCOMPARE(finished.at(0).at(0).toString(), QStringLiteral("rotated successfully"));
+        QCOMPARE(failed.size(), 0);
+        qunsetenv("P5_GEMINI_API_ENDPOINT_OVERRIDE");
+    }
+
     void asyncToolKeepsEventLoopResponsiveAndCompletesAgent()
     {
         HttpFixture http;

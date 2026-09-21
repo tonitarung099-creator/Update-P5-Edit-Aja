@@ -16,7 +16,8 @@ Cases: duplicate Run preserves active busy state and sends one HTTP request;
 Cancel/repeated Cancel/restart cannot report stale failure or completion; genuine
 invalid API JSON still reports failure and restores idle; a stalled HTTP request
 hits the configured deadline, restores idle, and a fresh request succeeds without
-stale timeout output; Cancel stops the pending timeout; a delayed asynchronous tool
+stale timeout output; Cancel stops the pending timeout; a Gemini-style 429 response
+rotates from the first API key to the second without a cloud call; a delayed asynchronous tool
 keeps a Qt heartbeat running before the follow-up API turn; cancelling that tool
 prevents stale completion and a fresh request can finish normally.
 
