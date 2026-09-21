@@ -62,6 +62,9 @@ TEXT_CHECKS = [
     ("src/aiassistant/openaicompatibleagent.cpp", r"handleRequestTimeout", "Bounded API request timeout handler"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"m_requestTimer->start\(m_requestTimeoutMs\)", "Per-turn API timeout start"),
     ("src/aiassistant/aiassistantwidget.cpp", r"requestTimeoutSeconds", "User-facing API request timeout setting"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"setMaximumBlockCount\(600\)", "Bounded AI trace block count"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"boundedDisplayHtml\(text, 12000\)", "Bounded AI trace entry display"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"setMaximumBlockCount\(120\)", "Bounded Local Edit history block count"),
 ]
 
 
