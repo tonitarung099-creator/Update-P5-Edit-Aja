@@ -31,6 +31,9 @@ class GeminiApiPoolPatchTests(unittest.TestCase):
     def test_keys_are_session_only_and_not_logged(self):
         self.assertIn("Session only", self.patch)
         self.assertIn("setEchoMode(QLineEdit::Password)", self.patch)
+        self.assertIn("QCryptographicHash::Sha256", self.patch)
+        self.assertIn("p5GeminiKeyPoolHash", self.patch)
+        self.assertNotIn('setProperty("p5GeminiKeyPool", serializedKeys)', self.patch)
         self.assertNotIn('settings.setValue(QStringLiteral("apiKey")', self.patch)
         self.assertNotIn("trace(requestApiKey", self.patch)
         self.assertNotIn("trace(m_apiKey", self.patch)
