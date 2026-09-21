@@ -1,3 +1,53 @@
+function Expand-EditAjaPortable {
+    param(
+        [Parameter(Mandatory = $true)][string]$PackageRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot
+    )
+
+    if (-not (Test-Path -LiteralPath $PackageRoot -PathType Container)) {
+        throw "Portable package directory not found: $PackageRoot"
+    }
+
+    $archives = @(
+        Get-ChildItem -LiteralPath $PackageRoot -File -Filter '*.zip' |
+            Where-Object { $_.Name -match '(?i)edit.?aja.*portable|portable.*edit.?aja' } |
+            Sort-Object Length -Descending
+    )
+    if ($archives.Count -eq 0) {
+        throw 'No Edit Aja portable ZIP was found in artifacts/windows.'
+    }
+
+    if (Test-Path -LiteralPath $DestinationRoot) {
+        Remove-Item -LiteralPath $DestinationRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force $DestinationRoot | Out-Null
+
+    $archive = $archives[0]
+    Write-Host "Portable smoke archive: $($archive.FullName)"
+    Expand-Archive -LiteralPath $archive.FullName -DestinationPath $DestinationRoot -Force
+
+    $apps = @(
+        Get-ChildItem -LiteralPath $DestinationRoot -Recurse -File -Filter 'kdenlive.exe' |
+            Where-Object { $_.Directory.Name -eq 'bin' } |
+            Sort-Object { $_.FullName.Length }
+    )
+    if ($apps.Count -eq 0) {
+        throw 'Portable ZIP extracted successfully but bin\kdenlive.exe was not found.'
+    }
+
+    $app = $apps[0]
+    $root = $app.Directory.Parent.FullName
+    if (Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'uninstall.exe' -ErrorAction SilentlyContinue | Select-Object -First 1) {
+        throw 'Portable package unexpectedly contains uninstall.exe.'
+    }
+
+    return [pscustomobject]@{
+        Archive = $archive.FullName
+        Root = $root
+        App = $app.FullName
+    }
+}
+
 function Assert-SmokeProcessRunning {
     param(
         [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
