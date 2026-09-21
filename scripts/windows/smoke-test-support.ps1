@@ -216,7 +216,7 @@ function Save-SmokeWindowScreenshot {
     [void][P5SmokeUiNative]::SetForegroundWindow($handle)
     Start-Sleep -Milliseconds 500
 
-    $bitmap = New-Object System.Drawing.Bitmap $width, $height
+    $bitmap = [System.Drawing.Bitmap]::new($width, $height)
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     $captureMethod = 'PrintWindow'
     try {
@@ -235,7 +235,7 @@ function Save-SmokeWindowScreenshot {
                 $rect.Top,
                 0,
                 0,
-                (New-Object System.Drawing.Size $width, $height)
+                ([System.Drawing.Size]::new($width, $height))
             )
         }
 
