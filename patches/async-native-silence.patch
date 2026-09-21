@@ -1,0 +1,178 @@
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -2360,6 +2360,175 @@
+             }
+ 
+             return errorResult(QStringLiteral("Unknown native editor tool: %1").arg(toolName));
++        },
++        [this](const QString &toolName, const QJsonObject &arguments, AiAssistantWidget::NativeToolCompletion completion)
++            -> AiAssistantWidget::NativeToolCancel {
++            auto fail = [completion](const QString &message) {
++                completion(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), message}});
++            };
++            if (toolName != QLatin1String("kdenlive_detect_silence") && toolName != QLatin1String("kdenlive_transcribe_media")) {
++                fail(QStringLiteral("Unknown async native editor tool: %1").arg(toolName));
++                return {};
++            }
++
++            TimelineWidget *timeline = getCurrentTimeline();
++            if (!timeline || !pCore->currentDoc()) {
++                fail(QStringLiteral("No active timeline/project"));
++                return {};
++            }
++            const auto model = timeline->model();
++            if (!model) {
++                fail(QStringLiteral("Timeline model is not ready"));
++                return {};
++            }
++
++            const double fps = pCore->getCurrentFps();
++            QString sourcePath = arguments.value(QStringLiteral("path")).toString().trimmed();
++            QString binId = arguments.value(QStringLiteral("bin_id")).toString().trimmed();
++            const int clipId = arguments.value(QStringLiteral("clip_id")).toInt(-1);
++            if (binId.isEmpty() && model->isClip(clipId)) {
++                binId = model->getClipBinId(clipId);
++            }
++            if (sourcePath.isEmpty() && !binId.isEmpty()) {
++                const auto projectModel = pCore->projectItemModel();
++                const auto clip = projectModel ? projectModel->getClipByBinID(binId) : nullptr;
++                if (clip) {
++                    sourcePath = clip->url();
++                }
++            }
++            if (sourcePath.startsWith(QLatin1String("file://"))) {
++                sourcePath = QUrl(sourcePath).toLocalFile();
++            }
++            if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath)) {
++                fail(QStringLiteral("Provide an existing media path, bin_id, or timeline clip_id"));
++                return {};
++            }
++            sourcePath = QFileInfo(sourcePath).absoluteFilePath();
++
++            if (toolName == QLatin1String("kdenlive_detect_silence")) {
++                QString ffmpeg = arguments.value(QStringLiteral("ffmpeg_path")).toString().trimmed();
++                if (ffmpeg.isEmpty()) {
++                    ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
++                }
++                if (ffmpeg.isEmpty() || !QFileInfo::exists(ffmpeg)) {
++                    fail(QStringLiteral("FFmpeg executable was not found. Install FFmpeg or provide ffmpeg_path."));
++                    return {};
++                }
++                const double noiseDb = qBound(-100.0, arguments.value(QStringLiteral("noise_db")).toDouble(-35.0), 0.0);
++                const double minimum = qBound(0.05, arguments.value(QStringLiteral("minimum_silence_seconds")).toDouble(0.45), 30.0);
++                const int timeoutSeconds = qBound(5, arguments.value(QStringLiteral("timeout_seconds")).toInt(120), 600);
++                const QString filter = QStringLiteral("silencedetect=noise=%1dB:d=%2").arg(noiseDb, 0, 'f', 1).arg(minimum, 0, 'f', 3);
++
++                auto *process = new QProcess(this);
++                process->setProcessChannelMode(QProcess::SeparateChannels);
++                process->setProgram(ffmpeg);
++                process->setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-nostats"), QStringLiteral("-i"), sourcePath,
++                                       QStringLiteral("-vn"), QStringLiteral("-af"), filter, QStringLiteral("-f"), QStringLiteral("null"), QStringLiteral("-")});
++                auto *startupTimer = new QTimer(process);
++                startupTimer->setSingleShot(true);
++                auto *deadlineTimer = new QTimer(process);
++                deadlineTimer->setSingleShot(true);
++                QPointer<QProcess> guardedProcess(process);
++
++                auto completeOnce = [guardedProcess, completion](const QJsonObject &result) {
++                    if (!guardedProcess || guardedProcess->property("editAjaAsyncCompleted").toBool()) {
++                        return;
++                    }
++                    guardedProcess->setProperty("editAjaAsyncCompleted", true);
++                    if (!guardedProcess->property("editAjaAsyncCancelled").toBool()) {
++                        completion(result);
++                    }
++                    guardedProcess->deleteLater();
++                };
++                connect(startupTimer, &QTimer::timeout, process, [guardedProcess, completeOnce]() {
++                    if (!guardedProcess) {
++                        return;
++                    }
++                    const QString error = guardedProcess->errorString();
++                    stopAgentOwnedProcess(guardedProcess);
++                    completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                             {QStringLiteral("error"), QStringLiteral("Could not start FFmpeg within 5 seconds: %1").arg(error)}});
++                });
++                connect(deadlineTimer, &QTimer::timeout, process, [guardedProcess, completeOnce, timeoutSeconds]() {
++                    if (!guardedProcess) {
++                        return;
++                    }
++                    stopAgentOwnedProcess(guardedProcess);
++                    completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                             {QStringLiteral("error"), QStringLiteral("FFmpeg silence detection timed out after %1 seconds").arg(timeoutSeconds)}});
++                });
++                connect(process, &QProcess::started, process, [startupTimer, deadlineTimer, timeoutSeconds]() {
++                    startupTimer->stop();
++                    deadlineTimer->start(timeoutSeconds * 1000);
++                });
++                connect(process, &QProcess::errorOccurred, process, [completeOnce](QProcess::ProcessError error) {
++                    if (error == QProcess::FailedToStart) {
++                        completeOnce(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Could not start FFmpeg")}});
++                    }
++                });
++                connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), process,
++                        [guardedProcess, startupTimer, deadlineTimer, completeOnce, sourcePath, noiseDb, minimum](int exitCode, QProcess::ExitStatus exitStatus) {
++                            startupTimer->stop();
++                            deadlineTimer->stop();
++                            if (!guardedProcess || guardedProcess->property("editAjaAsyncCancelled").toBool()) {
++                                if (guardedProcess) {
++                                    guardedProcess->deleteLater();
++                                }
++                                return;
++                            }
++                            const QString diagnostic = QString::fromUtf8(guardedProcess->readAllStandardError());
++                            if (exitStatus != QProcess::NormalExit || exitCode != 0) {
++                                completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                                         {QStringLiteral("error"), QStringLiteral("FFmpeg failed: %1").arg(diagnostic.right(3000))}});
++                                return;
++                            }
++
++                            const QRegularExpression startRe(QStringLiteral("silence_start:\s*([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))"));
++                            const QRegularExpression endRe(QStringLiteral("silence_end:\s*([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)).*silence_duration:\s*([0-9.]+)"));
++                            QJsonArray silences;
++                            double pendingStart = -1.0;
++                            for (const QString &line : diagnostic.split(QLatin1Char('\n'))) {
++                                const auto startMatch = startRe.match(line);
++                                if (startMatch.hasMatch()) {
++                                    pendingStart = startMatch.captured(1).toDouble();
++                                }
++                                const auto endMatch = endRe.match(line);
++                                if (endMatch.hasMatch()) {
++                                    const double end = endMatch.captured(1).toDouble();
++                                    const double duration = endMatch.captured(2).toDouble();
++                                    const double start = pendingStart >= 0.0 ? pendingStart : qMax(0.0, end - duration);
++                                    silences.push_back(QJsonObject{{QStringLiteral("start_seconds"), start},
++                                                                   {QStringLiteral("end_seconds"), end},
++                                                                   {QStringLiteral("duration_seconds"), duration}});
++                                    pendingStart = -1.0;
++                                }
++                            }
++                            completeOnce(QJsonObject{{QStringLiteral("ok"), true},
++                                                     {QStringLiteral("operation"), QStringLiteral("kdenlive_detect_silence")},
++                                                     {QStringLiteral("path"), sourcePath},
++                                                     {QStringLiteral("noise_db"), noiseDb},
++                                                     {QStringLiteral("minimum_silence_seconds"), minimum},
++                                                     {QStringLiteral("count"), silences.size()},
++                                                     {QStringLiteral("silences"), silences}});
++                        });
++
++                process->start();
++                startupTimer->start(5000);
++                return [guardedProcess, startupTimer, deadlineTimer]() {
++                    startupTimer->stop();
++                    deadlineTimer->stop();
++                    if (!guardedProcess || guardedProcess->property("editAjaAsyncCompleted").toBool()) {
++                        return;
++                    }
++                    guardedProcess->setProperty("editAjaAsyncCancelled", true);
++                    guardedProcess->setProperty("editAjaAsyncCompleted", true);
++                    stopAgentOwnedProcess(guardedProcess);
++                    guardedProcess->deleteLater();
++                };
++            }
++
++            fail(QStringLiteral("Transcription async path is not wired yet"));
++            return {};
+         });
+ 
+     // Close non-general docks for the initial layout
