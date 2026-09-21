@@ -1,0 +1,116 @@
+--- a/src/aiassistant/aiassistantwidget.h
++++ b/src/aiassistant/aiassistantwidget.h
+@@ -40,11 +40,14 @@
+     using PanelCatalogProvider = std::function<QJsonArray()>;
+     using PanelExecutor = std::function<QJsonObject(const QString &)>;
+     using NativeToolExecutor = std::function<QJsonObject(const QString &, const QJsonObject &)>;
++    using NativeToolCompletion = std::function<void(const QJsonObject &)>;
++    using NativeToolCancel = std::function<void()>;
++    using NativeAsyncToolExecutor = std::function<NativeToolCancel(const QString &, const QJsonObject &, NativeToolCompletion)>;
+ 
+     explicit AiAssistantWidget(QWidget *parent = nullptr);
+ 
+     void configureEditorAccess(ActionCatalogProvider actionCatalog, ActionExecutor actionExecutor, PanelCatalogProvider panelCatalog,
+-                               PanelExecutor panelExecutor, NativeToolExecutor nativeToolExecutor);
++                               PanelExecutor panelExecutor, NativeToolExecutor nativeToolExecutor, NativeAsyncToolExecutor nativeAsyncToolExecutor);
+ 
+     /** Preview a lightweight offline-first Local Edit command without changing the timeline. */
+     QJsonObject previewLocalEditCommand(const QString &command);
+@@ -117,6 +120,7 @@
+     PanelCatalogProvider m_panelCatalog;
+     PanelExecutor m_panelExecutor;
+     NativeToolExecutor m_nativeToolExecutor;
++    NativeAsyncToolExecutor m_nativeAsyncToolExecutor;
+ 
+     AgentToolRegistry *m_registry{nullptr};
+     OpenAiCompatibleAgent *m_agent{nullptr};
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -664,13 +664,14 @@
+ }
+ 
+ void AiAssistantWidget::configureEditorAccess(ActionCatalogProvider actionCatalog, ActionExecutor actionExecutor, PanelCatalogProvider panelCatalog,
+-                                              PanelExecutor panelExecutor, NativeToolExecutor nativeToolExecutor)
++                                              PanelExecutor panelExecutor, NativeToolExecutor nativeToolExecutor, NativeAsyncToolExecutor nativeAsyncToolExecutor)
+ {
+     m_actionCatalog = std::move(actionCatalog);
+     m_actionExecutor = std::move(actionExecutor);
+     m_panelCatalog = std::move(panelCatalog);
+     m_panelExecutor = std::move(panelExecutor);
+     m_nativeToolExecutor = std::move(nativeToolExecutor);
++    m_nativeAsyncToolExecutor = std::move(nativeAsyncToolExecutor);
+ }
+ 
+ void AiAssistantWidget::prepareAgentPrompt(const QString &command)
+@@ -1212,8 +1213,14 @@
+     }
+ 
+     QSet<QString> tools;
++    QSet<QString> asyncTools;
+     for (const QJsonValue &value : m_registry->toolCatalog()) {
+-        tools.insert(value.toObject().value(QStringLiteral("name")).toString());
++        const QJsonObject catalogEntry = value.toObject();
++        const QString name = catalogEntry.value(QStringLiteral("name")).toString();
++        tools.insert(name);
++        if (catalogEntry.value(QStringLiteral("async")).toBool()) {
++            asyncTools.insert(name);
++        }
+     }
+     QSet<QString> ids;
+     const QJsonArray steps = stepsValue.toArray();
+@@ -1236,6 +1243,8 @@
+             errors << i18n("Step %1 has an invalid tool name: %2", i + 1, tool);
+         } else if (!tools.contains(tool)) {
+             errors << i18n("This build does not expose tool: %1", tool);
++        } else if (asyncTools.contains(tool)) {
++            errors << i18n("AI Edit JSON cannot run asynchronous analysis tool %1 directly. Run it through AI Agent/MCP first, then use its result in deterministic edit steps.", tool);
+         }
+         if (step.contains(QStringLiteral("arguments")) && !step.value(QStringLiteral("arguments")).isObject()) {
+             errors << i18n("Step %1 arguments must be an object", i + 1);
+@@ -1931,6 +1940,11 @@
+                     results.push_back(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Recursive sequence is not allowed")}});
+                     continue;
+                 }
++                if (m_registry->isAsyncTool(toolName)) {
++                    results.push_back(QJsonObject{{QStringLiteral("ok"), false},
++                                                  {QStringLiteral("error"), QStringLiteral("Asynchronous analysis tools must be called directly so their job can be awaited or cancelled: %1").arg(toolName)}});
++                    continue;
++                }
+                 results.push_back(m_registry->invoke(toolName, step.value(QStringLiteral("arguments")).toObject()));
+             }
+             return QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("results"), results}};
+@@ -1946,6 +1960,16 @@
+             return m_nativeToolExecutor(name, arguments);
+         });
+     };
++    auto registerAsyncNativeTool = [this](const QString &name, const QString &description, const QJsonObject &schema) {
++        m_registry->registerAsyncTool(name, description, schema, [this, name](const QJsonObject &arguments, AgentToolRegistry::Completion completion) {
++            if (!m_nativeAsyncToolExecutor) {
++                completion(QJsonObject{{QStringLiteral("ok"), false},
++                                       {QStringLiteral("error"), QStringLiteral("Async native editor tool bridge is not connected yet")}});
++                return AgentToolRegistry::CancelHandler{};
++            }
++            return m_nativeAsyncToolExecutor(name, arguments, std::move(completion));
++        });
++    };
+ 
+     const QJsonObject integerProperty{{QStringLiteral("type"), QStringLiteral("integer")}};
+     const QJsonObject numberProperty{{QStringLiteral("type"), QStringLiteral("number")}};
+@@ -2352,7 +2376,7 @@
+                                  {QStringLiteral("position_seconds"), numberProperty},
+                                  {QStringLiteral("path"), stringProperty}}}});
+ 
+-    registerNativeTool(
++    registerAsyncNativeTool(
+         QStringLiteral("kdenlive_detect_silence"),
+         QStringLiteral("Detect silent intervals in a media source with the local FFmpeg silencedetect filter. Accepts path, bin_id, or timeline clip_id."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
+@@ -2365,7 +2389,7 @@
+                                  {QStringLiteral("timeout_seconds"), integerProperty},
+                                  {QStringLiteral("ffmpeg_path"), stringProperty}}}});
+ 
+-    registerNativeTool(
++    registerAsyncNativeTool(
+         QStringLiteral("kdenlive_transcribe_media"),
+         QStringLiteral("Transcribe media with Kdenlive's local open-source Whisper integration and return timestamped segments. This can be slow and requires an installed Whisper model/dependencies."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},

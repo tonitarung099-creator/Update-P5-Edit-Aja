@@ -1,0 +1,224 @@
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -2527,8 +2527,219 @@
+                 };
+             }
+ 
+-            fail(QStringLiteral("Transcription async path is not wired yet"));
+-            return {};
++            SpeechToTextWhisper stt(this);
++            const QString script = stt.speechScript();
++            const auto pythonExec = stt.venvPythonExecs();
++            if (script.isEmpty() || !QFileInfo::exists(script)) {
++                fail(QStringLiteral("Kdenlive Whisper script is unavailable. Configure Speech Recognition in Kdenlive first."));
++                return {};
++            }
++            if (pythonExec.python.isEmpty()) {
++                fail(QStringLiteral("Kdenlive Whisper Python environment is unavailable. Configure Speech Recognition in Kdenlive first."));
++                return {};
++            }
++
++            const QString modelName = arguments.value(QStringLiteral("model")).toString(KdenliveSettings::whisperModel()).trimmed();
++            if (modelName.isEmpty()) {
++                fail(QStringLiteral("No Whisper model is configured"));
++                return {};
++            }
++            QString device = arguments.value(QStringLiteral("device")).toString(KdenliveSettings::whisperDevice()).trimmed();
++            if (device.isEmpty()) {
++                device = QStringLiteral("cpu");
++            }
++            QString language = arguments.value(QStringLiteral("language")).toString().trimmed();
++            if (language.isEmpty()) {
++                language = KdenliveSettings::whisperLanguage().trimmed();
++            }
++            const QString task = arguments.value(QStringLiteral("task")).toString(QStringLiteral("transcribe")) == QLatin1String("translate")
++                                     ? QStringLiteral("translate")
++                                     : QStringLiteral("transcribe");
++            QString ffmpeg = arguments.value(QStringLiteral("ffmpeg_path")).toString().trimmed();
++            if (ffmpeg.isEmpty()) {
++                ffmpeg = KdenliveSettings::ffmpegpath();
++            }
++            if (ffmpeg.isEmpty() || !QFileInfo::exists(ffmpeg)) {
++                ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
++            }
++            if (ffmpeg.isEmpty()) {
++                fail(QStringLiteral("FFmpeg executable was not found"));
++                return {};
++            }
++            const int timeoutSeconds = qBound(30, arguments.value(QStringLiteral("timeout_seconds")).toInt(1800), 7200);
++
++            bool mapTimelineClip = model->isClip(clipId);
++            int sourceIn = 0;
++            int sourceOut = -1;
++            int clipStart = 0;
++            int clipEnd = 0;
++            double clipSpeed = 1.0;
++            if (mapTimelineClip) {
++                const auto inOut = model->getClipInOut(clipId);
++                sourceIn = inOut.first;
++                sourceOut = inOut.second;
++                clipStart = model->getItemPosition(clipId);
++                clipEnd = model->getItemEnd(clipId);
++                clipSpeed = qAbs(model->getClipSpeed(clipId));
++                mapTimelineClip = clipSpeed > 0.000001;
++            }
++
++            QStringList processArgs{script, QStringLiteral("-S"), sourcePath, QStringLiteral("-M"), modelName, QStringLiteral("-D"), device,
++                                    QStringLiteral("-T"), task, QStringLiteral("-F"), ffmpeg};
++            if (!language.isEmpty()) {
++                processArgs << QStringLiteral("-L") << language;
++            }
++
++            auto *process = new QProcess(this);
++            process->setProcessChannelMode(QProcess::MergedChannels);
++            process->setProgram(pythonExec.python);
++            process->setArguments(processArgs);
++            auto *startupTimer = new QTimer(process);
++            startupTimer->setSingleShot(true);
++            auto *deadlineTimer = new QTimer(process);
++            deadlineTimer->setSingleShot(true);
++            QPointer<QProcess> guardedProcess(process);
++
++            auto completeOnce = [guardedProcess, completion](const QJsonObject &result) {
++                if (!guardedProcess || guardedProcess->property("editAjaAsyncCompleted").toBool()) {
++                    return;
++                }
++                guardedProcess->setProperty("editAjaAsyncCompleted", true);
++                if (!guardedProcess->property("editAjaAsyncCancelled").toBool()) {
++                    completion(result);
++                }
++                guardedProcess->deleteLater();
++            };
++            connect(startupTimer, &QTimer::timeout, process, [guardedProcess, completeOnce]() {
++                if (!guardedProcess) {
++                    return;
++                }
++                const QString error = guardedProcess->errorString();
++                stopAgentOwnedProcess(guardedProcess);
++                completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                         {QStringLiteral("error"), QStringLiteral("Could not start Whisper within 10 seconds: %1").arg(error)}});
++            });
++            connect(deadlineTimer, &QTimer::timeout, process, [guardedProcess, completeOnce, timeoutSeconds]() {
++                if (!guardedProcess) {
++                    return;
++                }
++                stopAgentOwnedProcess(guardedProcess);
++                completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                         {QStringLiteral("error"), QStringLiteral("Whisper transcription timed out after %1 seconds").arg(timeoutSeconds)}});
++            });
++            connect(process, &QProcess::started, process, [startupTimer, deadlineTimer, timeoutSeconds]() {
++                startupTimer->stop();
++                deadlineTimer->start(timeoutSeconds * 1000);
++            });
++            connect(process, &QProcess::errorOccurred, process, [completeOnce](QProcess::ProcessError error) {
++                if (error == QProcess::FailedToStart) {
++                    completeOnce(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Could not start Whisper")}});
++                }
++            });
++            connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), process,
++                    [guardedProcess, startupTimer, deadlineTimer, completeOnce, sourcePath, modelName, device, task, language, fps,
++                     mapTimelineClip, sourceIn, sourceOut, clipStart, clipEnd, clipSpeed](int exitCode, QProcess::ExitStatus exitStatus) {
++                        startupTimer->stop();
++                        deadlineTimer->stop();
++                        if (!guardedProcess || guardedProcess->property("editAjaAsyncCancelled").toBool()) {
++                            if (guardedProcess) {
++                                guardedProcess->deleteLater();
++                            }
++                            return;
++                        }
++                        const QByteArray outputBytes = guardedProcess->readAll();
++                        if (exitStatus != QProcess::NormalExit || exitCode != 0) {
++                            completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                                     {QStringLiteral("error"), QStringLiteral("Whisper failed: %1").arg(QString::fromUtf8(outputBytes.right(5000)))}});
++                            return;
++                        }
++
++                        const QString transcriptOutput = QString::fromUtf8(outputBytes);
++                        const QRegularExpression headerRe(QStringLiteral("^\[([0-9.+-]+)>([0-9.+-]+)\]\s*$"));
++                        const QRegularExpression wordRe(QStringLiteral("^\[([0-9.+-]+)>([0-9.+-]+)\](.*)$"));
++                        QJsonArray segments;
++                        double currentStart = -1.0;
++                        double currentEnd = -1.0;
++                        QString currentText;
++                        auto flushSegment = [&segments, &currentStart, &currentEnd, &currentText]() {
++                            const QString text = currentText.simplified();
++                            if (currentStart >= 0.0 && currentEnd > currentStart && !text.isEmpty()) {
++                                segments.push_back(QJsonObject{{QStringLiteral("start_seconds"), currentStart},
++                                                               {QStringLiteral("end_seconds"), currentEnd},
++                                                               {QStringLiteral("text"), text}});
++                            }
++                            currentStart = -1.0;
++                            currentEnd = -1.0;
++                            currentText.clear();
++                        };
++                        for (const QString &line : transcriptOutput.split(QLatin1Char('\n'))) {
++                            const auto headerMatch = headerRe.match(line.trimmed());
++                            if (headerMatch.hasMatch()) {
++                                flushSegment();
++                                currentStart = headerMatch.captured(1).toDouble();
++                                currentEnd = headerMatch.captured(2).toDouble();
++                                continue;
++                            }
++                            const auto wordMatch = wordRe.match(line);
++                            if (wordMatch.hasMatch() && currentStart >= 0.0) {
++                                currentText += wordMatch.captured(3);
++                            }
++                        }
++                        flushSegment();
++                        if (segments.isEmpty()) {
++                            completeOnce(QJsonObject{{QStringLiteral("ok"), false},
++                                                     {QStringLiteral("error"), QStringLiteral("Whisper completed but no timestamped segments were parsed. Output tail: %1").arg(transcriptOutput.right(3000))}});
++                            return;
++                        }
++
++                        QJsonArray timelineSegments;
++                        if (mapTimelineClip) {
++                            for (const QJsonValue &value : segments) {
++                                const QJsonObject segment = value.toObject();
++                                const int segmentSourceStart = qRound(segment.value(QStringLiteral("start_seconds")).toDouble() * fps);
++                                const int segmentSourceEnd = qRound(segment.value(QStringLiteral("end_seconds")).toDouble() * fps);
++                                const int overlapStart = qMax(segmentSourceStart, sourceIn);
++                                const int overlapEnd = qMin(segmentSourceEnd, sourceOut + 1);
++                                if (overlapEnd <= overlapStart) {
++                                    continue;
++                                }
++                                const int timelineStart = qBound(clipStart, clipStart + qRound((overlapStart - sourceIn) / clipSpeed), clipEnd);
++                                const int timelineEnd = qBound(clipStart, clipStart + qRound((overlapEnd - sourceIn) / clipSpeed), clipEnd);
++                                if (timelineEnd > timelineStart) {
++                                    timelineSegments.push_back(QJsonObject{{QStringLiteral("start_frame"), timelineStart},
++                                                                           {QStringLiteral("end_frame"), timelineEnd},
++                                                                           {QStringLiteral("start_seconds"), timelineStart / fps},
++                                                                           {QStringLiteral("end_seconds"), timelineEnd / fps},
++                                                                           {QStringLiteral("text"), segment.value(QStringLiteral("text"))}});
++                                }
++                            }
++                        }
++
++                        completeOnce(QJsonObject{{QStringLiteral("ok"), true},
++                                                 {QStringLiteral("operation"), QStringLiteral("kdenlive_transcribe_media")},
++                                                 {QStringLiteral("path"), sourcePath},
++                                                 {QStringLiteral("model"), modelName},
++                                                 {QStringLiteral("device"), device},
++                                                 {QStringLiteral("task"), task},
++                                                 {QStringLiteral("language"), language},
++                                                 {QStringLiteral("count"), segments.size()},
++                                                 {QStringLiteral("segments"), segments},
++                                                 {QStringLiteral("timeline_segments"), timelineSegments}});
++                    });
++
++            process->start();
++            startupTimer->start(10000);
++            return [guardedProcess, startupTimer, deadlineTimer]() {
++                startupTimer->stop();
++                deadlineTimer->stop();
++                if (!guardedProcess || guardedProcess->property("editAjaAsyncCompleted").toBool()) {
++                    return;
++                }
++                guardedProcess->setProperty("editAjaAsyncCancelled", true);
++                guardedProcess->setProperty("editAjaAsyncCompleted", true);
++                stopAgentOwnedProcess(guardedProcess);
++                guardedProcess->deleteLater();
++            };
+         });
+ 
+     // Close non-general docks for the initial layout

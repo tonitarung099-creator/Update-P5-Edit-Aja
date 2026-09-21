@@ -50,6 +50,15 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"QProcess::started", "Film Context process started signal"),
     ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncTool\(\s*QStringLiteral\(\"movie_search\"\)", "Film Context tools registered asynchronously"),
     ("src/aiassistant/aiassistantwidget.cpp", r"m_filmContextIndexer, &QProcess::errorOccurred", "Nonblocking Film Context indexer startup error path"),
+    ("src/aiassistant/aiassistantwidget.h", r"NativeAsyncToolExecutor", "Async native editor executor contract"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool", "Async native tool registration bridge"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool\(\s*QStringLiteral\(\"kdenlive_detect_silence\"\)", "Silence detection registered asynchronously"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool\(\s*QStringLiteral\(\"kdenlive_transcribe_media\"\)", "Transcription registered asynchronously"),
+    ("src/mainwindow.cpp", r"stopAgentOwnedProcess", "Owned analysis process-tree cancellation"),
+    ("src/mainwindow.cpp", r"FFmpeg silence detection timed out", "Async silence deadline handling"),
+    ("src/mainwindow.cpp", r"Whisper transcription timed out", "Async transcription deadline handling"),
+    ("tools/mcp/kdenlive_mcp_server.py", r"jobs/status", "MCP async job polling"),
+    ("tools/api/kdenlive_agent_api_example.py", r"/jobs/\{job_id\}", "REST example async job polling"),
 ]
 
 
@@ -66,6 +75,13 @@ for tool in ("kdenlive_add_subtitle", "kdenlive_import_subtitles", "kdenlive_add
 REQUIRED_FILES = [
     ("src/aiassistant/aiassistantwidget.cpp", "Phase 5 AI assistant source"),
     ("data/scripts/filmcontext/film_context.py", "Phase 15 local Film Context backend"),
+    ("tools/mcp/kdenlive_mcp_server.py", "MCP bridge client"),
+    ("tools/api/kdenlive_agent_api_example.py", "REST bridge example client"),
+]
+
+
+FORBIDDEN_PATTERNS = [
+    ("src/mainwindow.cpp", r"waitForStarted|waitForFinished|waitForReadyRead", "Blocking QProcess wait remains in MainWindow AI tool bridge"),
 ]
 
 
@@ -85,10 +101,19 @@ def verify(root: Path) -> None:
         if not re.search(pattern, text, flags=re.MULTILINE):
             failures.append(f"{label} verification failed in {relative}")
 
+    for relative, pattern, label in FORBIDDEN_PATTERNS:
+        path = root / relative
+        if not path.is_file():
+            failures.append(f"{label} cannot be checked because {relative} is missing")
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if re.search(pattern, text, flags=re.MULTILINE):
+            failures.append(f"{label} in {relative}")
+
     if failures:
         raise SystemExit("\n".join(failures))
 
-    print(f"Verified {len(TEXT_CHECKS)} source markers and {len(REQUIRED_FILES)} required files.")
+    print(f"Verified {len(TEXT_CHECKS)} source markers, {len(FORBIDDEN_PATTERNS)} forbidden-pattern rules and {len(REQUIRED_FILES)} required files.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,85 @@
+--- a/tools/mcp/kdenlive_mcp_server.py
++++ b/tools/mcp/kdenlive_mcp_server.py
+@@ -12,6 +12,7 @@
+ import json
+ import socket
+ import tempfile
++import time
+ from pathlib import Path
+ from typing import Any
+ 
+@@ -47,7 +48,32 @@
+ 
+ 
+ def _call(name: str, arguments: dict[str, Any] | None = None) -> Any:
+-    return _bridge("tools/call", {"name": name, "arguments": arguments or {}})
++    args = arguments or {}
++    result = _bridge("tools/call", {"name": name, "arguments": args})
++    if not isinstance(result, dict) or not result.get("async"):
++        return result
++
++    job_id = str(result.get("job_id", ""))
++    if not job_id:
++        raise RuntimeError(f"Async Kdenlive tool {name} did not return a job id")
++    requested_timeout = args.get("timeout_seconds", 7200)
++    try:
++        wait_seconds = max(30, min(int(requested_timeout) + 30, 7230))
++    except (TypeError, ValueError):
++        wait_seconds = 7230
++    deadline = time.monotonic() + wait_seconds
++    while time.monotonic() < deadline:
++        status = _bridge("jobs/status", {"job_id": job_id})
++        if not isinstance(status, dict):
++            raise RuntimeError(f"Invalid async Kdenlive job response for {name}")
++        if status.get("status") != "running":
++            final = status.get("result")
++            if isinstance(final, dict):
++                return final
++            raise RuntimeError(f"Async Kdenlive job {job_id} ended without a result")
++        time.sleep(0.1)
++    _bridge("jobs/cancel", {"job_id": job_id})
++    raise RuntimeError(f"Timed out waiting for async Kdenlive tool {name}")
+ 
+ 
+ @mcp.tool()
+--- a/tools/api/kdenlive_agent_api_example.py
++++ b/tools/api/kdenlive_agent_api_example.py
+@@ -12,6 +12,7 @@
+ 
+ import json
+ import tempfile
++import time
+ import urllib.request
+ from pathlib import Path
+ from typing import Any
+@@ -47,7 +48,29 @@
+ 
+ 
+ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> Any:
+-    return _request("POST", "/tools/call", {"name": name, "arguments": arguments or {}})
++    args = arguments or {}
++    response = _request("POST", "/tools/call", {"name": name, "arguments": args})
++    result = response.get("result", {}) if isinstance(response, dict) else {}
++    if not isinstance(result, dict) or not result.get("async"):
++        return response
++
++    job_id = str(result.get("job_id", ""))
++    if not job_id:
++        raise RuntimeError(f"Async Kdenlive tool {name} did not return a job id")
++    requested_timeout = args.get("timeout_seconds", 7200)
++    try:
++        wait_seconds = max(30, min(int(requested_timeout) + 30, 7230))
++    except (TypeError, ValueError):
++        wait_seconds = 7230
++    deadline = time.monotonic() + wait_seconds
++    while time.monotonic() < deadline:
++        status_response = _request("GET", f"/jobs/{job_id}")
++        status = status_response.get("result", {}) if isinstance(status_response, dict) else {}
++        if status.get("status") != "running":
++            return {"ok": True, "result": status.get("result", {})}
++        time.sleep(0.1)
++    _request("POST", f"/jobs/{job_id}/cancel")
++    raise RuntimeError(f"Timed out waiting for async Kdenlive tool {name}")
+ 
+ 
+ if __name__ == "__main__":
