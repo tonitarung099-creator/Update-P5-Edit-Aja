@@ -24,6 +24,7 @@ class NonblockingFilmContextIndexerPatchTests(unittest.TestCase):
         )
         self.assertIn("QProcess::errorOccurred", added)
         self.assertIn("QProcess::FailedToStart", added)
+        self.assertIn("m_filmContextIndexer->errorString()", added)
         self.assertIn("m_filmContextBuildButton->setEnabled(true)", added)
         self.assertIn("m_filmContextVisualButton->setEnabled(true)", added)
         self.assertNotIn("waitForStarted", added)
