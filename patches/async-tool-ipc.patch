@@ -1,0 +1,54 @@
+--- a/src/aiassistant/agentipcserver.cpp
++++ b/src/aiassistant/agentipcserver.cpp
+@@ -148,8 +148,14 @@
+                 const QJsonObject params = request.value(QStringLiteral("params")).toObject();
+                 const QString name = params.value(QStringLiteral("name")).toString();
+                 const QJsonObject arguments = params.value(QStringLiteral("arguments")).toObject();
+-                response = QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), m_registry->invoke(name, arguments)}};
++                response = QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), m_registry->invokeOrStart(name, arguments)}};
+                 Q_EMIT activity(QStringLiteral("MCP tool call: %1").arg(name));
++            } else if (method == QLatin1String("jobs/status")) {
++                const QString jobId = request.value(QStringLiteral("params")).toObject().value(QStringLiteral("job_id")).toString();
++                response = QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), m_registry->jobStatus(jobId)}};
++            } else if (method == QLatin1String("jobs/cancel")) {
++                const QString jobId = request.value(QStringLiteral("params")).toObject().value(QStringLiteral("job_id")).toString();
++                response = QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), m_registry->cancelJob(jobId)}};
+             } else {
+                 response = QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown bridge method")}};
+             }
+@@ -233,6 +239,11 @@
+         writeHttpResponse(socket, 200, QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("tools"), m_registry->toolCatalog()}});
+         return;
+     }
++    if (method == "GET" && path.startsWith(QLatin1String("/v1/jobs/"))) {
++        const QString jobId = QUrl::fromPercentEncoding(path.mid(QStringLiteral("/v1/jobs/").size()).toUtf8());
++        writeHttpResponse(socket, 200, QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), m_registry->jobStatus(jobId)}});
++        return;
++    }
+ 
+     if (method != "POST") {
+         writeHttpResponse(socket, 405, QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Use GET or POST for this endpoint")}});
+@@ -250,6 +261,14 @@
+         bodyObject = doc.object();
+     }
+ 
++    if (path.startsWith(QLatin1String("/v1/jobs/")) && path.endsWith(QLatin1String("/cancel"))) {
++        QString jobId = path.mid(QStringLiteral("/v1/jobs/").size());
++        jobId.chop(QStringLiteral("/cancel").size());
++        jobId = QUrl::fromPercentEncoding(jobId.toUtf8());
++        writeHttpResponse(socket, 200, QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), m_registry->cancelJob(jobId)}});
++        return;
++    }
++
+     QString toolName;
+     QJsonObject arguments;
+     if (path == QLatin1String("/v1/tools/call")) {
+@@ -268,7 +287,7 @@
+         return;
+     }
+ 
+-    const QJsonObject result = m_registry->invoke(toolName, arguments);
++    const QJsonObject result = m_registry->invokeOrStart(toolName, arguments);
+     writeHttpResponse(socket, 200, QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("result"), result}});
+     Q_EMIT activity(QStringLiteral("REST tool call: %1").arg(toolName));
+ }
