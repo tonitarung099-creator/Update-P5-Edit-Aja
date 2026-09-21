@@ -29,7 +29,8 @@ class GeminiApiPoolPatchTests(unittest.TestCase):
             self.assertIn(marker, self.patch)
 
     def test_keys_are_session_only_and_not_logged(self):
-        self.assertIn("Keys stay in memory for this app session", self.patch)
+        self.assertIn("Session only", self.patch)
+        self.assertIn("setEchoMode(QLineEdit::Password)", self.patch)
         self.assertNotIn('settings.setValue(QStringLiteral("apiKey")', self.patch)
         self.assertNotIn("trace(requestApiKey", self.patch)
         self.assertNotIn("trace(m_apiKey", self.patch)
