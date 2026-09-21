@@ -261,6 +261,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "bounded-ai-output",
+      "path": "patches/bounded-ai-output.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -367,6 +374,10 @@
     {
       "source": "patches/agent-request-timeout-ui.patch",
       "destination": "craft/editaja/agent-request-timeout-ui.patch"
+    },
+    {
+      "source": "patches/bounded-ai-output.patch",
+      "destination": "craft/editaja/bounded-ai-output.patch"
     }
   ]
 }

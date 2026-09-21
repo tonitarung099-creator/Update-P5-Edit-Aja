@@ -38,7 +38,7 @@ class AgentRequestTimeoutPatchTests(unittest.TestCase):
         self.assertGreaterEqual(self.patch.count("m_requestTimer->stop();"), 3)
         self.assertIn("API request timed out after %1 seconds", self.patch)
 
-    def test_patch_precedes_timeout_ui_and_is_copied_to_craft(self):
+    def test_patch_precedes_timeout_ui_and_bounded_output_and_is_copied_to_craft(self):
         names = [entry["name"] for entry in self.manifest["apply_chain"]]
         entry = self.manifest["apply_chain"][names.index("agent-request-timeout")]
         self.assertEqual(entry["name"], "agent-request-timeout")
@@ -61,6 +61,11 @@ class AgentRequestTimeoutPatchTests(unittest.TestCase):
             chain.index('("agent-request-timeout.patch", 1)'),
             chain.index('("agent-request-timeout-ui.patch", 1)'),
         )
+        if '("bounded-ai-output.patch", 1)' in chain:
+            self.assertLess(
+                chain.index('("agent-request-timeout-ui.patch", 1)'),
+                chain.index('("bounded-ai-output.patch", 1)'),
+            )
 
 
 if __name__ == "__main__":
