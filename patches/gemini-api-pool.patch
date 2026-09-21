@@ -1,0 +1,312 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -21,2 +21,3 @@
+ #include <QFileDialog>
++#include <QCryptographicHash>
+ #include <QFileInfo>
+@@ -47,2 +48,3 @@
+ #include <QTextBrowser>
++#include <QVariantMap>
+ #include <QTextDocument>
+@@ -583,16 +585,40 @@
+ 
+-    auto *apiGroup = new QGroupBox(i18n("API agent"), this);
++    auto *apiGroup = new QGroupBox(i18n("Gemini API"), this);
+     auto *apiForm = new QFormLayout(apiGroup);
+ 
+-    m_apiUrl = new QLineEdit(settings.value(QStringLiteral("apiUrl"), QStringLiteral("http://127.0.0.1:11434/v1/chat/completions")).toString(), apiGroup);
+-    m_apiUrl->setPlaceholderText(QStringLiteral("https://.../v1/chat/completions"));
+-    apiForm->addRow(i18n("Chat API URL"), m_apiUrl);
+-
+-    m_model = new QLineEdit(settings.value(QStringLiteral("model"), QStringLiteral("qwen3:8b")).toString(), apiGroup);
+-    apiForm->addRow(i18n("Model"), m_model);
++    auto *geminiEndpoint = new QLabel(i18n("Gemini Developer API · automatic key rotation"), apiGroup);
++    geminiEndpoint->setWordWrap(true);
++    geminiEndpoint->setToolTip(QStringLiteral("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"));
++    apiForm->addRow(i18n("Provider"), geminiEndpoint);
++
++    QString savedGeminiModel = settings.value(QStringLiteral("model"), QStringLiteral("gemini-3.8-flash")).toString().trimmed();
++    if (!savedGeminiModel.startsWith(QStringLiteral("gemini-"), Qt::CaseInsensitive)) {
++        savedGeminiModel = QStringLiteral("gemini-3.8-flash");
++    }
++    m_model = new QLineEdit(savedGeminiModel, apiGroup);
++    m_model->setPlaceholderText(QStringLiteral("gemini-3.8-flash"));
++    apiForm->addRow(i18n("Gemini model"), m_model);
+ 
+     m_apiKey = new QLineEdit(apiGroup);
++    m_apiKey->setObjectName(QStringLiteral("geminiApiKeyPool"));
+     m_apiKey->setEchoMode(QLineEdit::Password);
+-    m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
+-    apiForm->addRow(i18n("API key"), m_apiKey);
++    m_apiKey->setPlaceholderText(i18n("Paste up to 100 Gemini API keys separated by comma, semicolon or spaces. Session only."));
++    apiForm->addRow(i18n("Gemini API keys"), m_apiKey);
++
++    auto *geminiKeyStatus = new QLabel(apiGroup);
++    geminiKeyStatus->setWordWrap(true);
++    apiForm->addRow(QString(), geminiKeyStatus);
++    auto refreshGeminiKeyStatus = [this, geminiKeyStatus]() {
++        QStringList keys;
++        const QStringList candidates = m_apiKey->text().split(QRegularExpression(QStringLiteral("[\\s,;]+")), Qt::SkipEmptyParts);
++        for (const QString &candidate : candidates) {
++            const QString key = candidate.trimmed();
++            if (!key.isEmpty() && !keys.contains(key)) {
++                keys.push_back(key);
++            }
++        }
++        geminiKeyStatus->setText(i18n("%1 / 100 keys loaded · switches automatically on quota/rate-limit or invalid-key errors. Keys from the same Google Cloud project share project quota.", keys.size()));
++    };
++    connect(m_apiKey, &QLineEdit::textChanged, this, refreshGeminiKeyStatus);
++    refreshGeminiKeyStatus();
+ 
+@@ -615,3 +641,3 @@
+     m_attachVisionFrames->setChecked(false);
+-    m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next API turn. Leave this off for text-only models."));
++    m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next Gemini turn."));
+     apiForm->addRow(QString(), m_attachVisionFrames);
+@@ -623,3 +649,3 @@
+     requestTimeoutSeconds->setSuffix(i18n(" s"));
+-    requestTimeoutSeconds->setToolTip(i18n("Maximum wait for each API model response. Increase this for slower local models. Tool jobs have their own cancellation and deadline rules."));
++    requestTimeoutSeconds->setToolTip(i18n("Maximum wait for each Gemini model response. Tool jobs have their own cancellation and deadline rules."));
+     apiForm->addRow(i18n("Request timeout"), requestTimeoutSeconds);
+@@ -629,3 +655,3 @@
+ 
+-    toolBox->addItem(apiGroup, i18n("API"));
++    toolBox->addItem(apiGroup, i18n("Gemini"));
+ 
+@@ -1620,5 +1646,28 @@
+ 
++    const QString model = m_model->text().trimmed();
++    if (!model.startsWith(QStringLiteral("gemini-"), Qt::CaseInsensitive)) {
++        appendTrace(i18n("P5 AI Agent is Gemini-only. Use a Gemini model name such as gemini-3.8-flash."));
++        return;
++    }
++
++    QStringList apiKeys;
++    const QStringList candidates = m_apiKey->text().split(QRegularExpression(QStringLiteral("[\\s,;]+")), Qt::SkipEmptyParts);
++    for (const QString &candidate : candidates) {
++        const QString key = candidate.trimmed();
++        if (!key.isEmpty() && !apiKeys.contains(key)) {
++            apiKeys.push_back(key);
++        }
++    }
++    if (apiKeys.isEmpty()) {
++        appendTrace(i18n("Add at least one Gemini API key first."));
++        return;
++    }
++    if (apiKeys.size() > 100) {
++        appendTrace(i18n("Gemini API key pool supports at most 100 unique keys."));
++        return;
++    }
++
+     QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
+-    settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
+-    settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
++    settings.remove(QStringLiteral("apiUrl"));
++    settings.setValue(QStringLiteral("model"), model);
+     const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
+@@ -1634,3 +1683,13 @@
+ 
+-    m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
++    const QString serializedKeys = apiKeys.join(QLatin1Char('\n'));
++    const QString keyPoolFingerprint = QString::fromLatin1(QCryptographicHash::hash(serializedKeys.toUtf8(), QCryptographicHash::Sha256).toHex());
++    const bool keyPoolChanged = m_agent->property("p5GeminiKeyPoolHash").toString() != keyPoolFingerprint;
++    m_agent->configure(QStringLiteral("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), model, serializedKeys);
++    m_agent->setProperty("p5GeminiOnly", true);
++    if (keyPoolChanged) {
++        m_agent->setProperty("p5GeminiKeyPoolHash", keyPoolFingerprint);
++        m_agent->setProperty("p5GeminiKeyIndex", 0);
++        m_agent->setProperty("p5GeminiInvalidKeys", QString());
++        m_agent->setProperty("p5GeminiCooldowns", QVariantMap{});
++    }
+     m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000);
+--- a/src/aiassistant/openaicompatibleagent.cpp
++++ b/src/aiassistant/openaicompatibleagent.cpp
+@@ -9,2 +9,3 @@
+ 
++#include <QDateTime>
+ #include <QJsonDocument>
+@@ -15,6 +16,90 @@
+ #include <QNetworkReply>
++#include <QSet>
++#include <QRegularExpression>
+ #include <QNetworkRequest>
+ #include <QTimer>
++#include <QtMath>
++#include <QVariantMap>
+ #include <QUrl>
+ 
++namespace {
++QStringList geminiKeyPool(const QString &serialized)
++{
++    QStringList keys;
++    const QStringList candidates = serialized.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
++    for (const QString &candidate : candidates) {
++        const QString key = candidate.trimmed();
++        if (!key.isEmpty() && !keys.contains(key)) {
++            keys.push_back(key);
++            if (keys.size() == 100) {
++                break;
++            }
++        }
++    }
++    return keys;
++}
++
++QSet<int> invalidGeminiKeyIndexes(const QObject *agent)
++{
++    QSet<int> result;
++    const QStringList parts = agent->property("p5GeminiInvalidKeys").toString().split(QLatin1Char(','), Qt::SkipEmptyParts);
++    for (const QString &part : parts) {
++        bool ok = false;
++        const int index = part.toInt(&ok);
++        if (ok) {
++            result.insert(index);
++        }
++    }
++    return result;
++}
++
++void storeInvalidGeminiKeyIndexes(QObject *agent, const QSet<int> &indexes)
++{
++    QStringList parts;
++    for (int index : indexes) {
++        parts.push_back(QString::number(index));
++    }
++    agent->setProperty("p5GeminiInvalidKeys", parts.join(QLatin1Char(',')));
++}
++
++int nextAvailableGeminiKey(const QObject *agent, int startAfter, int keyCount)
++{
++    if (keyCount <= 0) {
++        return -1;
++    }
++    const QSet<int> invalid = invalidGeminiKeyIndexes(agent);
++    const QVariantMap cooldowns = agent->property("p5GeminiCooldowns").toMap();
++    const qint64 now = QDateTime::currentMSecsSinceEpoch();
++    for (int offset = 1; offset <= keyCount; ++offset) {
++        const int index = (startAfter + offset + keyCount) % keyCount;
++        if (invalid.contains(index)) {
++            continue;
++        }
++        if (cooldowns.value(QString::number(index)).toLongLong() > now) {
++            continue;
++        }
++        return index;
++    }
++    return -1;
++}
++
++int geminiRetryDelaySeconds(QNetworkReply *reply, const QByteArray &body)
++{
++    bool ok = false;
++    const int headerSeconds = reply->rawHeader("Retry-After").trimmed().toInt(&ok);
++    if (ok && headerSeconds > 0) {
++        return qBound(5, headerSeconds, 24 * 60 * 60);
++    }
++    const QRegularExpression retryExpression(QStringLiteral("retry(?:Delay|_delay)[^0-9]{0,20}([0-9]+(?:\\.[0-9]+)?)s"), QRegularExpression::CaseInsensitiveOption);
++    const auto match = retryExpression.match(QString::fromUtf8(body));
++    if (match.hasMatch()) {
++        const int seconds = qCeil(match.captured(1).toDouble());
++        if (seconds > 0) {
++            return qBound(5, seconds, 24 * 60 * 60);
++        }
++    }
++    return 60;
++}
++}
++
+ OpenAiCompatibleAgent::OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent)
+@@ -42,2 +127,3 @@
+ {
++    setProperty("p5GeminiOnly", false);
+     m_url = chatCompletionsUrl.trimmed();
+@@ -63,2 +149,10 @@
+     }
++    if (property("p5GeminiOnly").toBool()) {
++        const QStringList keys = geminiKeyPool(m_apiKey);
++        const int current = property("p5GeminiKeyIndex").toInt();
++        if (nextAvailableGeminiKey(this, current - 1, keys.size()) < 0) {
++            fail(QStringLiteral("No Gemini API key is currently available. Add a valid key or wait for a rate-limit cooldown."));
++            return;
++        }
++    }
+ 
+@@ -108,3 +202,5 @@
+ {
+-    if (++m_round > m_maxRounds) {
++    const bool retrySameRound = property("p5GeminiRetrySameRound").toBool();
++    setProperty("p5GeminiRetrySameRound", false);
++    if (!retrySameRound && ++m_round > m_maxRounds) {
+         fail(QStringLiteral("Agent stopped after %1 tool rounds to avoid an accidental loop.").arg(m_maxRounds));
+@@ -123,4 +219,18 @@
+     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+-    if (!m_apiKey.isEmpty()) {
+-        request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + m_apiKey.toUtf8());
++
++    int geminiKeyIndex = -1;
++    QString requestApiKey = m_apiKey;
++    if (property("p5GeminiOnly").toBool()) {
++        const QStringList keys = geminiKeyPool(m_apiKey);
++        const int current = property("p5GeminiKeyIndex").toInt();
++        geminiKeyIndex = nextAvailableGeminiKey(this, current - 1, keys.size());
++        if (geminiKeyIndex < 0) {
++            fail(QStringLiteral("All Gemini API keys are unavailable or temporarily rate-limited."));
++            return;
++        }
++        setProperty("p5GeminiKeyIndex", geminiKeyIndex);
++        requestApiKey = keys.at(geminiKeyIndex);
++    }
++    if (!requestApiKey.isEmpty()) {
++        request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + requestApiKey.toUtf8());
+     }
+@@ -128,2 +238,3 @@
+     QNetworkReply *reply = m_network->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
++    reply->setProperty("p5GeminiKeyIndex", geminiKeyIndex);
+     m_reply = reply;
+@@ -146,2 +257,46 @@
+     if (reply->error() != QNetworkReply::NoError) {
++        if (property("p5GeminiOnly").toBool()) {
++            const QStringList keys = geminiKeyPool(m_apiKey);
++            const int keyIndex = reply->property("p5GeminiKeyIndex").toInt();
++            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
++            const QString message = QString::fromUtf8(bytes).toLower();
++            const bool quotaLimited = status == 429
++                || ((status == 403 || status == 400)
++                    && (message.contains(QStringLiteral("resource_exhausted")) || message.contains(QStringLiteral("quota"))
++                        || message.contains(QStringLiteral("rate limit")) || message.contains(QStringLiteral("rate_limit"))));
++            const bool invalidKey = status == 401
++                || message.contains(QStringLiteral("api key not valid")) || message.contains(QStringLiteral("invalid api key"))
++                || message.contains(QStringLiteral("api_key_invalid")) || message.contains(QStringLiteral("invalid authentication"));
++
++            if (keyIndex >= 0 && keyIndex < keys.size() && (quotaLimited || invalidKey)) {
++                if (invalidKey) {
++                    auto invalid = invalidGeminiKeyIndexes(this);
++                    invalid.insert(keyIndex);
++                    storeInvalidGeminiKeyIndexes(this, invalid);
++                    Q_EMIT trace(QStringLiteral("Gemini key %1/%2 is invalid and was disabled for this app session.")
++                                     .arg(keyIndex + 1)
++                                     .arg(keys.size()));
++                } else {
++                    const int retrySeconds = geminiRetryDelaySeconds(reply, bytes);
++                    QVariantMap cooldowns = property("p5GeminiCooldowns").toMap();
++                    cooldowns.insert(QString::number(keyIndex), QDateTime::currentMSecsSinceEpoch() + qint64(retrySeconds) * 1000);
++                    setProperty("p5GeminiCooldowns", cooldowns);
++                    Q_EMIT trace(QStringLiteral("Gemini key %1/%2 hit a quota or rate limit; cooling it down for %3 seconds.")
++                                     .arg(keyIndex + 1)
++                                     .arg(keys.size())
++                                     .arg(retrySeconds));
++                }
++
++                const int next = nextAvailableGeminiKey(this, keyIndex, keys.size());
++                if (next >= 0) {
++                    setProperty("p5GeminiKeyIndex", next);
++                    setProperty("p5GeminiRetrySameRound", true);
++                    Q_EMIT trace(QStringLiteral("Switching automatically to Gemini key %1/%2.").arg(next + 1).arg(keys.size()));
++                    sendTurn();
++                    return;
++                }
++                fail(QStringLiteral("No Gemini API key is ready right now. Keys from the same Google Cloud project share quota; add a key from another project or wait for cooldown."));
++                return;
++            }
++        }
+         fail(QStringLiteral("API error: %1\n%2").arg(reply->errorString(), QString::fromUtf8(bytes.left(4000))));
