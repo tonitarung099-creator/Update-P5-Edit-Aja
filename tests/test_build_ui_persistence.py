@@ -23,7 +23,9 @@ class BuildUiPersistenceTests(unittest.TestCase):
             "FindBestTopLevelWindow",
             "EnumWindows(",
             "GetWindowTextLength",
-            "largest_visible_titled_top_level_window",
+            "Splash Screen",
+            "Update P5 Edit Aja",
+            "largest_visible_non_splash_edit_aja_window",
         ):
             self.assertIn(marker, self.support)
 
