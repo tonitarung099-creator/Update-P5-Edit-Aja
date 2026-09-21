@@ -59,6 +59,9 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r"Whisper transcription timed out", "Async transcription deadline handling"),
     ("tools/mcp/kdenlive_mcp_server.py", r"jobs/status", "MCP async job polling"),
     ("tools/api/kdenlive_agent_api_example.py", r"/jobs/\{job_id\}", "REST example async job polling"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"handleRequestTimeout", "Bounded API request timeout handler"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"m_requestTimer->start\(m_requestTimeoutMs\)", "Per-turn API timeout start"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"requestTimeoutSeconds", "Configurable API request timeout UI"),
 ]
 
 
