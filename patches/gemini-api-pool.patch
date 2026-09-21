@@ -1,13 +1,13 @@
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -36,6 +36,7 @@
- #include <QLineEdit>
- #include <QPushButton>
- #include <QProcess>
-+#include <QPlainTextEdit>
- #include <QPointer>
- #include <QRegularExpression>
- #include <QScrollArea>
+@@ -45,6 +45,7 @@
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
++#include <QVariantMap>
+ #include <QTextDocument>
+ #include <QTimer>
+ #include <QToolBox>
 @@ -581,20 +582,44 @@
              });
      refreshFilmContextStatus();
@@ -22,11 +22,6 @@
 -
 -    m_model = new QLineEdit(settings.value(QStringLiteral("model"), QStringLiteral("qwen3:8b")).toString(), apiGroup);
 -    apiForm->addRow(i18n("Model"), m_model);
--
--    m_apiKey = new QLineEdit(apiGroup);
--    m_apiKey->setEchoMode(QLineEdit::Password);
--    m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
--    apiForm->addRow(i18n("API key"), m_apiKey);
 +    auto *geminiEndpoint = new QLabel(i18n("Gemini Developer API · automatic key rotation"), apiGroup);
 +    geminiEndpoint->setWordWrap(true);
 +    geminiEndpoint->setToolTip(QStringLiteral("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"));
@@ -39,28 +34,30 @@
 +    m_model = new QLineEdit(savedGeminiModel, apiGroup);
 +    m_model->setPlaceholderText(QStringLiteral("gemini-3.8-flash"));
 +    apiForm->addRow(i18n("Gemini model"), m_model);
-+
-+    auto *geminiApiKeys = new QPlainTextEdit(apiGroup);
-+    geminiApiKeys->setObjectName(QStringLiteral("geminiApiKeyPool"));
-+    geminiApiKeys->setPlaceholderText(i18n("Paste up to 100 Gemini API keys, one per line. Keys stay in memory for this app session and are never written to logs."));
-+    geminiApiKeys->setMaximumHeight(130);
-+    apiForm->addRow(i18n("Gemini API keys"), geminiApiKeys);
+ 
+     m_apiKey = new QLineEdit(apiGroup);
++    m_apiKey->setObjectName(QStringLiteral("geminiApiKeyPool"));
+     m_apiKey->setEchoMode(QLineEdit::Password);
+-    m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
+-    apiForm->addRow(i18n("API key"), m_apiKey);
++    m_apiKey->setPlaceholderText(i18n("Paste up to 100 Gemini API keys separated by comma, semicolon or spaces. Session only."));
++    apiForm->addRow(i18n("Gemini API keys"), m_apiKey);
 +
 +    auto *geminiKeyStatus = new QLabel(apiGroup);
 +    geminiKeyStatus->setWordWrap(true);
 +    apiForm->addRow(QString(), geminiKeyStatus);
-+    auto refreshGeminiKeyStatus = [geminiApiKeys, geminiKeyStatus]() {
++    auto refreshGeminiKeyStatus = [this, geminiKeyStatus]() {
 +        QStringList keys;
-+        const QStringList lines = geminiApiKeys->toPlainText().split(QRegularExpression(QStringLiteral("[\r\n,;]+")), Qt::SkipEmptyParts);
-+        for (const QString &line : lines) {
-+            const QString key = line.trimmed();
++        const QStringList candidates = m_apiKey->text().split(QRegularExpression(QStringLiteral("[\\s,;]+")), Qt::SkipEmptyParts);
++        for (const QString &candidate : candidates) {
++            const QString key = candidate.trimmed();
 +            if (!key.isEmpty() && !keys.contains(key)) {
 +                keys.push_back(key);
 +            }
 +        }
 +        geminiKeyStatus->setText(i18n("%1 / 100 keys loaded · switches automatically on quota/rate-limit or invalid-key errors. Keys from the same Google Cloud project share project quota.", keys.size()));
 +    };
-+    connect(geminiApiKeys, &QPlainTextEdit::textChanged, this, refreshGeminiKeyStatus);
++    connect(m_apiKey, &QLineEdit::textChanged, this, refreshGeminiKeyStatus);
 +    refreshGeminiKeyStatus();
  
      m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
@@ -90,7 +87,7 @@
  
      auto *mcpGroup = new QGroupBox(i18n("MCP"), this);
      auto *mcpLayout = new QVBoxLayout(mcpGroup);
-@@ -1618,9 +1643,35 @@
+@@ -1618,9 +1643,32 @@
          return;
      }
  
@@ -100,15 +97,12 @@
 +        return;
 +    }
 +
-+    auto *geminiApiKeys = findChild<QPlainTextEdit *>(QStringLiteral("geminiApiKeyPool"));
 +    QStringList apiKeys;
-+    if (geminiApiKeys) {
-+        const QStringList lines = geminiApiKeys->toPlainText().split(QRegularExpression(QStringLiteral("[\r\n,;]+")), Qt::SkipEmptyParts);
-+        for (const QString &line : lines) {
-+            const QString key = line.trimmed();
-+            if (!key.isEmpty() && !apiKeys.contains(key)) {
-+                apiKeys.push_back(key);
-+            }
++    const QStringList candidates = m_apiKey->text().split(QRegularExpression(QStringLiteral("[\\s,;]+")), Qt::SkipEmptyParts);
++    for (const QString &candidate : candidates) {
++        const QString key = candidate.trimmed();
++        if (!key.isEmpty() && !apiKeys.contains(key)) {
++            apiKeys.push_back(key);
 +        }
 +    }
 +    if (apiKeys.isEmpty()) {
@@ -128,7 +122,7 @@
      const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
  
      m_output->clear();
-@@ -1632,7 +1683,16 @@
+@@ -1632,7 +1680,16 @@
                          .arg(i18n("Checkpoint:"), QString::fromUtf8(QJsonDocument(checkpoint).toJson(QJsonDocument::Compact)).toHtmlEscaped()));
      }
  
@@ -148,7 +142,7 @@
      m_agent->run(prompt, m_fullAccess->isChecked(), maxRounds, m_attachVisionFrames->isChecked());
 --- a/src/aiassistant/openaicompatibleagent.cpp
 +++ b/src/aiassistant/openaicompatibleagent.cpp
-@@ -7,15 +7,100 @@
+@@ -7,16 +7,101 @@
  #include "openaicompatibleagent.h"
  #include "agenttoolregistry.h"
  
@@ -166,7 +160,7 @@
 +#include <QtMath>
 +#include <QVariantMap>
  #include <QUrl>
-+
+ 
 +namespace {
 +QStringList geminiKeyPool(const QString &serialized)
 +{
@@ -246,9 +240,10 @@
 +    return 60;
 +}
 +}
- 
++
  OpenAiCompatibleAgent::OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent)
      : QObject(parent)
+     , m_registry(registry)
 @@ -40,6 +125,7 @@
  
  void OpenAiCompatibleAgent::configure(const QString &chatCompletionsUrl, const QString &model, const QString &apiKey)
@@ -257,11 +252,10 @@
      m_url = chatCompletionsUrl.trimmed();
      m_model = model.trimmed();
      m_apiKey = apiKey;
-@@ -60,6 +146,14 @@
-     if (m_url.isEmpty() || m_model.isEmpty()) {
+@@ -61,6 +147,14 @@
          fail(QStringLiteral("Configure the API URL and model first."));
          return;
-+    }
+     }
 +    if (property("p5GeminiOnly").toBool()) {
 +        const QStringList keys = geminiKeyPool(m_apiKey);
 +        const int current = property("p5GeminiKeyIndex").toInt();
@@ -269,9 +263,10 @@
 +            fail(QStringLiteral("No Gemini API key is currently available. Add a valid key or wait for a rate-limit cooldown."));
 +            return;
 +        }
-     }
++    }
  
      clearPendingToolState();
+     m_fullToolAccess = fullToolAccess;
 @@ -106,7 +200,9 @@
  
  void OpenAiCompatibleAgent::sendTurn()
