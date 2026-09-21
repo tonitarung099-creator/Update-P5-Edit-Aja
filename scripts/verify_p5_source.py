@@ -32,6 +32,10 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r"Quick Edit: potong 5", "Creator Workspace Quick Edit command surface"),
     ("src/aiassistant/aiassistantwidget.cpp", r"aiAssistantToolbox", "Compact AI Agent supporting-tool toolbox"),
     ("src/aiassistant/aiassistantwidget.cpp", r"toolBox->addItem\(localEditGroup, i18n\(\"Quick Edit\"\)\)", "AI Agent Quick Edit toolbox page"),
+    ("src/mainwindow.cpp", r"editaja/creatorLayoutVersion", "One-time creator layout migration state"),
+    ("src/mainwindow.cpp", r"Location_OnLeft, m_projectMonitorDock", "Creator layout media-left docking"),
+    ("src/mainwindow.cpp", r"Location_OnRight, m_projectMonitorDock", "Creator layout AI/properties-right docking"),
+    ("src/mainwindow.cpp", r"Location_OnBottom, nullptr, timelineSize", "Creator layout full-width bottom timeline"),
 ]
 
 
