@@ -161,6 +161,16 @@ public static class P5SmokeUiNative
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool MoveWindow(
+        IntPtr hWnd,
+        int x,
+        int y,
+        int width,
+        int height,
+        bool repaint
+    );
 }
 '@
     }
@@ -188,6 +198,91 @@ function Wait-SmokeMainWindow {
     }
 
     throw "Packaged application did not expose a main window within $TimeoutSeconds seconds."
+}
+
+function Get-SmokeWindowBounds {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process
+    )
+
+    Initialize-SmokeUiNative
+    $handle = Wait-SmokeMainWindow -Process $Process
+    $rect = New-Object 'P5SmokeUiNative+RECT'
+    if (-not [P5SmokeUiNative]::GetWindowRect($handle, [ref]$rect)) {
+        throw "Could not read packaged application window bounds. Win32=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -lt 200 -or $height -lt 120) {
+        throw "Packaged application window bounds are implausible: $width x $height."
+    }
+
+    $dpi = [P5SmokeUiNative]::GetDpiForWindow($handle)
+    if ($dpi -eq 0) { $dpi = 96 }
+
+    return [pscustomobject]@{
+        left = [int]$rect.Left
+        top = [int]$rect.Top
+        right = [int]$rect.Right
+        bottom = [int]$rect.Bottom
+        width = [int]$width
+        height = [int]$height
+        dpi = [int]$dpi
+        scale_percent = [Math]::Round(($dpi / 96.0) * 100)
+    }
+}
+
+function Set-SmokeWindowBounds {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [int]$Left = 48,
+        [int]$Top = 48,
+        [int]$Width = 940,
+        [int]$Height = 680
+    )
+
+    Initialize-SmokeUiNative
+    $handle = Wait-SmokeMainWindow -Process $Process
+    # Restore from maximized/minimized state before applying a deterministic
+    # test geometry. The measured geometry, not these requested values, becomes
+    # the persistence baseline because Windows may apply DPI/work-area limits.
+    [void][P5SmokeUiNative]::ShowWindow($handle, 9)
+    Start-Sleep -Milliseconds 250
+    if (-not [P5SmokeUiNative]::MoveWindow($handle, $Left, $Top, $Width, $Height, $true)) {
+        throw "Could not set packaged application window bounds. Win32=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+    Start-Sleep -Milliseconds 750
+    return Get-SmokeWindowBounds -Process $Process
+}
+
+function Close-SmokeWindowGracefully {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [int]$TimeoutSeconds = 20
+    )
+
+    Initialize-SmokeUiNative
+    $handle = Wait-SmokeMainWindow -Process $Process
+    $result = [UIntPtr]::Zero
+    # WM_CLOSE gives Qt/Kdenlive the normal close-event path so its window
+    # geometry/state settings have a chance to persist. A forced taskkill would
+    # not be valid evidence for UI persistence.
+    $sent = [P5SmokeUiNative]::SendMessageTimeout(
+        $handle,
+        0x0010,
+        [UIntPtr]::Zero,
+        [IntPtr]::Zero,
+        2,
+        5000,
+        [ref]$result
+    )
+    if ($sent -eq [IntPtr]::Zero) {
+        throw "Packaged application did not accept WM_CLOSE for persistence verification."
+    }
+    if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
+        throw "Packaged application did not exit normally within $TimeoutSeconds seconds after WM_CLOSE."
+    }
 }
 
 function Save-SmokeWindowScreenshot {
