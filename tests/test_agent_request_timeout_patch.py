@@ -38,8 +38,10 @@ class AgentRequestTimeoutPatchTests(unittest.TestCase):
         self.assertGreaterEqual(self.patch.count("m_requestTimer->stop();"), 3)
         self.assertIn("API request timed out after %1 seconds", self.patch)
 
-    def test_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
+    def test_patch_precedes_bounded_output_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        timeout_index = names.index("agent-request-timeout")
+        entry = self.manifest["apply_chain"][timeout_index]
         self.assertEqual(entry["name"], "agent-request-timeout")
         self.assertEqual(entry["path"], "patches/agent-request-timeout.patch")
         self.assertTrue(entry["check"])
@@ -55,7 +57,12 @@ class AgentRequestTimeoutPatchTests(unittest.TestCase):
         )
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("agent-request-timeout.patch", 1)]'))
+        self.assertIn('("agent-request-timeout.patch", 1)', chain)
+        if '("bounded-ai-output.patch", 1)' in chain:
+            self.assertLess(
+                chain.index('("agent-request-timeout.patch", 1)'),
+                chain.index('("bounded-ai-output.patch", 1)'),
+            )
 
 
 if __name__ == "__main__":
