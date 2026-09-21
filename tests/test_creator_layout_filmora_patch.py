@@ -54,9 +54,13 @@ class CreatorLayoutFilmoraPatchTests(unittest.TestCase):
         self.assertNotIn("kdenlive_save_project", self.patch)
         self.assertNotIn("configureEditorAccess", self.patch)
 
-    def test_layout_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
-        self.assertEqual(entry["name"], "creator-layout-filmora")
+    def test_layout_patch_precedes_reset_patch_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        layout_index = names.index("creator-layout-filmora")
+        reset_index = names.index("creator-layout-reset")
+        self.assertLess(layout_index, reset_index)
+
+        entry = self.manifest["apply_chain"][layout_index]
         self.assertEqual(entry["path"], "patches/creator-layout-filmora.patch")
         self.assertTrue(entry["check"])
         self.assertTrue(entry["ignore_space_change"])
@@ -71,7 +75,12 @@ class CreatorLayoutFilmoraPatchTests(unittest.TestCase):
         )
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("creator-layout-filmora.patch", 1)]'))
+        self.assertIn('("creator-layout-filmora.patch", 1)', chain)
+        self.assertIn('("creator-layout-reset.patch", 1)', chain)
+        self.assertLess(
+            chain.index('("creator-layout-filmora.patch", 1)'),
+            chain.index('("creator-layout-reset.patch", 1)'),
+        )
 
 
 if __name__ == "__main__":
