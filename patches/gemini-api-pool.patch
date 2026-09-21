@@ -1,6 +1,14 @@
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -45,6 +45,7 @@
+@@ -19,6 +19,7 @@
+ #include <QDateTime>
+ #include <QFile>
+ #include <QFileDialog>
++#include <QCryptographicHash>
+ #include <QFileInfo>
+ #include <QFont>
+ #include <QFormLayout>
+@@ -45,6 +46,7 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
@@ -8,7 +16,7 @@
  #include <QTextDocument>
  #include <QTimer>
  #include <QToolBox>
-@@ -581,20 +582,44 @@
+@@ -581,20 +583,44 @@
              });
      refreshFilmContextStatus();
  
@@ -62,7 +70,7 @@
  
      m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
      m_fullAccess->setChecked(true);
-@@ -613,7 +638,7 @@
+@@ -613,7 +639,7 @@
  
      m_attachVisionFrames = new QCheckBox(i18n("Attach exported frames to vision-capable API models"), apiGroup);
      m_attachVisionFrames->setChecked(false);
@@ -71,7 +79,7 @@
      apiForm->addRow(QString(), m_attachVisionFrames);
  
      auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
-@@ -621,13 +646,13 @@
+@@ -621,13 +647,13 @@
      requestTimeoutSeconds->setRange(15, 3600);
      requestTimeoutSeconds->setValue(qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600));
      requestTimeoutSeconds->setSuffix(i18n(" s"));
@@ -87,7 +95,7 @@
  
      auto *mcpGroup = new QGroupBox(i18n("MCP"), this);
      auto *mcpLayout = new QVBoxLayout(mcpGroup);
-@@ -1618,9 +1643,32 @@
+@@ -1618,9 +1644,32 @@
          return;
      }
  
@@ -122,17 +130,18 @@
      const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
  
      m_output->clear();
-@@ -1632,7 +1680,16 @@
+@@ -1632,7 +1681,17 @@
                          .arg(i18n("Checkpoint:"), QString::fromUtf8(QJsonDocument(checkpoint).toJson(QJsonDocument::Compact)).toHtmlEscaped()));
      }
  
 -    m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
 +    const QString serializedKeys = apiKeys.join(QLatin1Char('\n'));
-+    const bool keyPoolChanged = m_agent->property("p5GeminiKeyPool").toString() != serializedKeys;
++    const QString keyPoolFingerprint = QString::fromLatin1(QCryptographicHash::hash(serializedKeys.toUtf8(), QCryptographicHash::Sha256).toHex());
++    const bool keyPoolChanged = m_agent->property("p5GeminiKeyPoolHash").toString() != keyPoolFingerprint;
 +    m_agent->configure(QStringLiteral("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), model, serializedKeys);
 +    m_agent->setProperty("p5GeminiOnly", true);
 +    if (keyPoolChanged) {
-+        m_agent->setProperty("p5GeminiKeyPool", serializedKeys);
++        m_agent->setProperty("p5GeminiKeyPoolHash", keyPoolFingerprint);
 +        m_agent->setProperty("p5GeminiKeyIndex", 0);
 +        m_agent->setProperty("p5GeminiInvalidKeys", QString());
 +        m_agent->setProperty("p5GeminiCooldowns", QVariantMap{});
