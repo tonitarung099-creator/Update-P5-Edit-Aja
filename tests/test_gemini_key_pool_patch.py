@@ -34,7 +34,9 @@ class GeminiKeyPoolPatchTests(unittest.TestCase):
         )
         self.assertIn("Built-in AI Agent uses Google Gemini only", additions)
         self.assertIn("up to 100 Gemini API keys", additions)
+        self.assertIn("auto *agentGroup = new QGroupBox(this);", additions)
         self.assertNotIn("Connect an OpenAI-compatible API inside the editor", additions)
+        self.assertNotIn('QGroupBox(i18n("AI Agent — Main Control")', additions)
 
     def test_pool_is_bounded_and_rotates_on_quota(self):
         for marker in (
