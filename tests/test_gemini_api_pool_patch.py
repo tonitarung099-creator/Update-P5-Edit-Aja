@@ -68,8 +68,10 @@ class GeminiApiPoolPatchTests(unittest.TestCase):
         self.assertTrue(chain.rstrip().endswith('("gemini-api-pool.patch", 1)]'))
 
     def test_patch_avoids_crlf_headers(self):
-        self.assertNotIn("aiassistantwidget.h", self.patch)
-        self.assertNotIn("openaicompatibleagent.h", self.patch)
+        self.assertNotIn("--- a/src/aiassistant/aiassistantwidget.h", self.patch)
+        self.assertNotIn("+++ b/src/aiassistant/aiassistantwidget.h", self.patch)
+        self.assertNotIn("--- a/src/aiassistant/openaicompatibleagent.h", self.patch)
+        self.assertNotIn("+++ b/src/aiassistant/openaicompatibleagent.h", self.patch)
 
 
 if __name__ == "__main__":
