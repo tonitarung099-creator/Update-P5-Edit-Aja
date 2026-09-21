@@ -41,6 +41,14 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r"Location_OnBottom, nullptr, timelineSize", "Creator layout full-width bottom timeline"),
     ("src/mainwindow.cpp", r"void MainWindow::applyCreatorLayout\(\)", "Reusable Creator Layout restore action"),
     ("src/mainwindow.cpp", r"creatorLayoutButton", "Creator Workspace Layout restore button"),
+    ("src/aiassistant/agenttoolregistry.cpp", r"registerAsyncTool", "Shared async tool registration"),
+    ("src/aiassistant/agenttoolregistry.cpp", r"invokeOrStart", "Shared async tool job start"),
+    ("src/aiassistant/agentipcserver.cpp", r"/v1/jobs/", "REST async tool job status/cancel endpoints"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"processNextToolCall", "AI Agent async tool continuation"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"cancelJob\(toolJobId\)", "AI Agent async tool cancellation"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"startFilmContextTool", "Event-driven Film Context process path"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"QProcess::started", "Film Context process started signal"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncTool\(\s*QStringLiteral\(\"movie_search\"\)", "Film Context tools registered asynchronously"),
 ]
 
 

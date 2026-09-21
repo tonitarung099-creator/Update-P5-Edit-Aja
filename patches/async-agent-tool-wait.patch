@@ -1,0 +1,268 @@
+--- a/src/aiassistant/openaicompatibleagent.h
++++ b/src/aiassistant/openaicompatibleagent.h
+@@ -41,11 +41,17 @@
+ private:
+     void sendTurn();
+     void handleReply(QNetworkReply *reply);
++    void processNextToolCall();
++    void appendToolResult(const QJsonObject &call, const QJsonObject &result);
++    void clearPendingToolState();
+     void fail(const QString &message);
+ 
+     AgentToolRegistry *m_registry{nullptr};
+     QNetworkAccessManager *m_network{nullptr};
+     QPointer<QNetworkReply> m_reply;
++    QString m_toolJobId;
++    QJsonArray m_pendingToolCalls;
++    int m_pendingToolIndex{0};
+     QString m_url;
+     QString m_model;
+     QString m_apiKey;
+--- a/src/aiassistant/openaicompatibleagent.cpp
++++ b/src/aiassistant/openaicompatibleagent.cpp
+@@ -21,6 +21,17 @@
+     , m_registry(registry)
+     , m_network(new QNetworkAccessManager(this))
+ {
++    if (m_registry) {
++        connect(m_registry, &AgentToolRegistry::jobFinished, this, [this](const QString &jobId, const QJsonObject &result) {
++            if (jobId != m_toolJobId || m_pendingToolIndex < 0 || m_pendingToolIndex >= m_pendingToolCalls.size()) {
++                return;
++            }
++            m_toolJobId.clear();
++            appendToolResult(m_pendingToolCalls.at(m_pendingToolIndex).toObject(), result);
++            ++m_pendingToolIndex;
++            processNextToolCall();
++        });
++    }
+ }
+ 
+ void OpenAiCompatibleAgent::configure(const QString &chatCompletionsUrl, const QString &model, const QString &apiKey)
+@@ -32,7 +43,7 @@
+ 
+ void OpenAiCompatibleAgent::run(const QString &prompt, bool fullToolAccess, int maxRounds, bool attachToolImages)
+ {
+-    if (m_reply) {
++    if (m_reply || !m_toolJobId.isEmpty()) {
+         // Reject only the extra request; the active request still owns busy state.
+         Q_EMIT failed(QStringLiteral("An agent request is already running."));
+         return;
+@@ -42,6 +53,7 @@
+         return;
+     }
+ 
++    clearPendingToolState();
+     m_fullToolAccess = fullToolAccess;
+     m_attachToolImages = attachToolImages;
+     m_maxRounds = qBound(1, maxRounds, 128);
+@@ -66,6 +78,12 @@
+ 
+ void OpenAiCompatibleAgent::cancel()
+ {
++    const QString toolJobId = m_toolJobId;
++    clearPendingToolState();
++    if (!toolJobId.isEmpty() && m_registry) {
++        m_registry->cancelJob(toolJobId);
++    }
++
+     // abort() may emit finished synchronously. Detach first so its callback
+     // cannot report a cancellation as an API error or alter a later run.
+     QNetworkReply *reply = m_reply.data();
+@@ -140,79 +158,134 @@
+ 
+     const QJsonArray toolCalls = message.value(QStringLiteral("tool_calls")).toArray();
+     if (!toolCalls.isEmpty() && m_registry) {
+-        for (const QJsonValue &value : toolCalls) {
+-            const QJsonObject call = value.toObject();
+-            const QString callId = call.value(QStringLiteral("id")).toString();
+-            const QJsonObject function = call.value(QStringLiteral("function")).toObject();
+-            const QString name = function.value(QStringLiteral("name")).toString();
+-            const QByteArray rawArgs = function.value(QStringLiteral("arguments")).toString().toUtf8();
+-            QJsonObject arguments;
+-            if (!rawArgs.isEmpty()) {
+-                const QJsonDocument argsDoc = QJsonDocument::fromJson(rawArgs);
+-                if (argsDoc.isObject()) {
+-                    arguments = argsDoc.object();
+-                }
+-            }
+-
+-            Q_EMIT trace(QStringLiteral("Tool: %1").arg(name));
+-            const QJsonObject result = m_registry->invoke(name, arguments);
+-            const QString resultText = QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact));
+-            m_messages.push_back(QJsonObject{{QStringLiteral("role"), QStringLiteral("tool")},
+-                                             {QStringLiteral("tool_call_id"), callId},
+-                                             {QStringLiteral("content"), resultText}});
+-
+-            // Tools can opt into multimodal inspection by returning one
+-            // agent_image_path or an agent_image_paths array. Film Context uses
+-            // the array form to attach only a few finalist keyframes.
+-            if (m_attachToolImages) {
+-                QStringList imagePaths;
+-                const QString singlePath = result.value(QStringLiteral("agent_image_path")).toString();
+-                if (!singlePath.isEmpty()) {
+-                    imagePaths << singlePath;
+-                }
+-                for (const auto &pathValue : result.value(QStringLiteral("agent_image_paths")).toArray()) {
+-                    const QString path = pathValue.toString();
+-                    if (!path.isEmpty() && !imagePaths.contains(path)) {
+-                        imagePaths << path;
+-                    }
+-                    if (imagePaths.size() >= 6) {
+-                        break;
+-                    }
+-                }
+-                QJsonArray content;
+-                for (const QString &imagePath : imagePaths) {
+-                    QFile imageFile(imagePath);
+-                    if (!imageFile.exists() || imageFile.size() > 12 * 1024 * 1024 || !imageFile.open(QIODevice::ReadOnly)) {
+-                        continue;
+-                    }
+-                    const QByteArray imageBytes = imageFile.readAll();
+-                    const QString suffix = QFileInfo(imagePath).suffix().toLower();
+-                    const QString mime = suffix == QLatin1String("jpg") || suffix == QLatin1String("jpeg") ? QStringLiteral("image/jpeg")
+-                                                                                                          : QStringLiteral("image/png");
+-                    const QString dataUrl = QStringLiteral("data:%1;base64,%2").arg(mime, QString::fromLatin1(imageBytes.toBase64()));
+-                    content.push_back(QJsonObject{{QStringLiteral("type"), QStringLiteral("image_url")},
+-                                                  {QStringLiteral("image_url"), QJsonObject{{QStringLiteral("url"), dataUrl}}}});
+-                    Q_EMIT trace(QStringLiteral("Attached selected frame to vision-capable API model: %1").arg(imagePath));
+-                }
+-                if (!content.isEmpty()) {
+-                    content.prepend(QJsonObject{{QStringLiteral("type"), QStringLiteral("text")},
+-                                                {QStringLiteral("text"), QStringLiteral("Selected local frames for visual inspection; these are not the whole movie.")}});
+-                    m_messages.push_back(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
+-                }
+-            }
+-            Q_EMIT trace(QStringLiteral("Result: %1").arg(resultText));
+-        }
+-        sendTurn();
++        m_pendingToolCalls = toolCalls;
++        m_pendingToolIndex = 0;
++        processNextToolCall();
+         return;
+     }
+ 
+     const QString content = message.value(QStringLiteral("content")).toString();
++    clearPendingToolState();
+     Q_EMIT busyChanged(false);
+     Q_EMIT finished(content.isEmpty() ? QStringLiteral("Agent completed without a text response.") : content);
+ }
+ 
++void OpenAiCompatibleAgent::processNextToolCall()
++{
++    if (!m_registry) {
++        fail(QStringLiteral("Agent tool registry is unavailable."));
++        return;
++    }
++    if (m_pendingToolIndex >= m_pendingToolCalls.size()) {
++        clearPendingToolState();
++        sendTurn();
++        return;
++    }
++
++    const QJsonObject call = m_pendingToolCalls.at(m_pendingToolIndex).toObject();
++    const QJsonObject function = call.value(QStringLiteral("function")).toObject();
++    const QString name = function.value(QStringLiteral("name")).toString();
++    const QByteArray rawArgs = function.value(QStringLiteral("arguments")).toString().toUtf8();
++    QJsonObject arguments;
++    if (!rawArgs.isEmpty()) {
++        const QJsonDocument argsDoc = QJsonDocument::fromJson(rawArgs);
++        if (argsDoc.isObject()) {
++            arguments = argsDoc.object();
++        }
++    }
++
++    Q_EMIT trace(QStringLiteral("Tool: %1").arg(name));
++    if (!m_registry->isAsyncTool(name)) {
++        appendToolResult(call, m_registry->invoke(name, arguments));
++        ++m_pendingToolIndex;
++        processNextToolCall();
++        return;
++    }
++
++    const QJsonObject started = m_registry->invokeOrStart(name, arguments);
++    if (!started.value(QStringLiteral("async")).toBool()) {
++        appendToolResult(call, started);
++        ++m_pendingToolIndex;
++        processNextToolCall();
++        return;
++    }
++
++    m_toolJobId = started.value(QStringLiteral("job_id")).toString();
++    if (m_toolJobId.isEmpty()) {
++        appendToolResult(call, QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Async tool did not return a job id.")}});
++        ++m_pendingToolIndex;
++        processNextToolCall();
++        return;
++    }
++
++    // A deterministic test handler may complete synchronously before jobFinished
++    // can be matched to m_toolJobId. Read the retained terminal result once.
++    const QJsonObject status = m_registry->jobStatus(m_toolJobId);
++    if (status.value(QStringLiteral("status")).toString() != QLatin1String("running")) {
++        m_toolJobId.clear();
++        appendToolResult(call, status.value(QStringLiteral("result")).toObject());
++        ++m_pendingToolIndex;
++        processNextToolCall();
++    }
++}
++
++void OpenAiCompatibleAgent::appendToolResult(const QJsonObject &call, const QJsonObject &result)
++{
++    const QString callId = call.value(QStringLiteral("id")).toString();
++    const QString resultText = QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact));
++    m_messages.push_back(QJsonObject{{QStringLiteral("role"), QStringLiteral("tool")},
++                                     {QStringLiteral("tool_call_id"), callId},
++                                     {QStringLiteral("content"), resultText}});
++
++    if (m_attachToolImages) {
++        QStringList imagePaths;
++        const QString singlePath = result.value(QStringLiteral("agent_image_path")).toString();
++        if (!singlePath.isEmpty()) {
++            imagePaths << singlePath;
++        }
++        for (const auto &pathValue : result.value(QStringLiteral("agent_image_paths")).toArray()) {
++            const QString path = pathValue.toString();
++            if (!path.isEmpty() && !imagePaths.contains(path)) {
++                imagePaths << path;
++            }
++            if (imagePaths.size() >= 6) {
++                break;
++            }
++        }
++        QJsonArray content;
++        for (const QString &imagePath : imagePaths) {
++            QFile imageFile(imagePath);
++            if (!imageFile.exists() || imageFile.size() > 12 * 1024 * 1024 || !imageFile.open(QIODevice::ReadOnly)) {
++                continue;
++            }
++            const QByteArray imageBytes = imageFile.readAll();
++            const QString suffix = QFileInfo(imagePath).suffix().toLower();
++            const QString mime = suffix == QLatin1String("jpg") || suffix == QLatin1String("jpeg") ? QStringLiteral("image/jpeg")
++                                                                                                  : QStringLiteral("image/png");
++            const QString dataUrl = QStringLiteral("data:%1;base64,%2").arg(mime, QString::fromLatin1(imageBytes.toBase64()));
++            content.push_back(QJsonObject{{QStringLiteral("type"), QStringLiteral("image_url")},
++                                          {QStringLiteral("image_url"), QJsonObject{{QStringLiteral("url"), dataUrl}}}});
++            Q_EMIT trace(QStringLiteral("Attached selected frame to vision-capable API model: %1").arg(imagePath));
++        }
++        if (!content.isEmpty()) {
++            content.prepend(QJsonObject{{QStringLiteral("type"), QStringLiteral("text")},
++                                        {QStringLiteral("text"), QStringLiteral("Selected local frames for visual inspection; these are not the whole movie.")}});
++            m_messages.push_back(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), content}});
++        }
++    }
++    Q_EMIT trace(QStringLiteral("Result: %1").arg(resultText));
++}
++
++void OpenAiCompatibleAgent::clearPendingToolState()
++{
++    m_toolJobId.clear();
++    m_pendingToolCalls = {};
++    m_pendingToolIndex = 0;
++}
++
+ void OpenAiCompatibleAgent::fail(const QString &message)
+ {
++    clearPendingToolState();
+     Q_EMIT busyChanged(false);
+     Q_EMIT failed(message);
+ }

@@ -8,8 +8,8 @@ Do not describe this audit as a complete interactive Windows UI test.
 ## Verified baseline (refresh before changing anything)
 
 - Repository: `tonitarung099-creator/Update-P5-Edit-Aja` (not Edit-Aja-Gemini).
-- Audited main: `dfbc232861a7d9466214228e1ca8e4fcb92355a1`.
-- Main quality run `35558927632` (#60): PASS.
+- Continuation main before UI-03: `183da535fcfb934309d586bc0d7c758a320fbd5e`.
+- Main quality run `35559542466` (#63): PASS.
 - Latest completed Windows run inspected: `35522742493` (#75), source
   `8c70026cbe7df521ef8c57902ce9801dad2ab304`, job `106109527735`: PASS.
 - #75 actual logs: installer/startup, live AI panel registration/open command,
@@ -18,9 +18,10 @@ Do not describe this audit as a complete interactive Windows UI test.
 - #75 still warns that both smoke uninstall invocations exited -1; uninstall PASS
   must not be inferred from the workflow conclusion.
 - #76 `35558745152` on `1ff97e10092b4bb52853031387e3ec531bb0ca15`
-  was active; #77 `35558960153` on audited main was pending at audit start.
-  Neither is evidence that the latest layout has already worked in a packaged app.
-- Main changes since #75: creator-layout migration and one-click layout restore.
+  remains active at this continuation; #78 `35559601944` on `183da535...` is
+  pending. Neither is evidence for the UI-03 async change in this branch.
+- Main changes since #75: creator-layout migration, one-click layout restore and
+  AI request lifecycle guards from PR #40.
 - Open PRs at audit start: none. Other chats can modify this repo: refresh main,
   PRs and run lineage immediately before pushing/merging.
 
@@ -40,7 +41,7 @@ Do not replace the real UI with a mockup and report it as verification.
 | --- | --- | --- | --- | --- |
 | UI-01 | P1 / fix in this change; packaged verification pending | `setBusy` disables Run but leaves prompt enabled; Return calls `runAgent`, clears output and runs checkpoint before backend rejects duplicate. Backend rejection also emits busy=false while original request is live. | `aiassistantwidget.cpp` runAgent/setBusy; `openaicompatibleagent.cpp` run. Guard before side effects, disable prompt while busy, reject duplicate without changing active busy state. | Delayed local API fixture: duplicate start produces one HTTP request, no false idle event; UI Return while busy does not clear trace or create a second checkpoint. |
 | UI-02 | P1 / fix in this change; packaged verification pending | Cancel calls abort before detaching current reply; finished callback processes even stale replies. Cancellation can emit API failure and old replies can alter later state. | `openaicompatibleagent.cpp` cancel/sendTurn. Detach first, ignore completions that no longer own active reply, preserve deferred deletion. | Qt component test cancel, cancel twice, immediately start new request: no cancellation API error or old completion; new request finishes and busy transitions correctly. |
-| UI-03 | P0 / CONFIRMED blocking code, runtime duration NOT MEASURED | `invokeFilmContextTool` waits synchronously up to 30s (120s for keyframes), with 3s startup and 2s cleanup; registry executes handlers synchronously on widget thread. During a blocking wait the UI cannot process Cancel/repaint. | `aiassistantwidget.cpp` invokeFilmContextTool; `agenttoolregistry.*`, `openaicompatibleagent.cpp`, `agentipcserver.cpp`. Design async completion/job IDs for process-backed tools shared by API and REST; native timeline mutations stay on GUI thread. | Slow fake backend: GUI timer/heartbeat continues; cancel stops owned process tree and prevents further edits; timeout restores controls; REST/API get exactly one terminal result. Do not use processEvents/nested event loop as a shortcut. |
+| UI-03 | P0 / fix in this change; packaged verification pending | The synchronous Film Context tool path is replaced by bounded async jobs. Native timeline tools remain synchronous on the GUI thread; process-backed Film Context uses signal/timer-driven `QProcess`, shared job IDs, status/cancel for REST/MCP, and Agent continuation without a nested event loop. | `agenttoolregistry.*`, `agentipcserver.cpp`, `openaicompatibleagent.*`, `aiassistantwidget.*`; patches `async-*`. Qt regression uses a delayed local async fixture and cancel/restart path. | Patch-chain application PASS locally. PR gates must compile the reconstructed production registry/agent and prove heartbeat/cancel behavior. Exact-source packaged Windows behavior remains NOT TESTED until the post-merge build. |
 | UI-04 | P1 / CONFIRMED additional blocking paths | Film Context index buttons call waitForStarted(3000); MainWindow silence-detection path uses waitForFinished and transcription startup waits. | Audit these call sites with UI-03; async started/errorOccurred/finished, bounded progress, cancel controls; do not put QWidget/MLT editing operations on arbitrary worker threads. | Missing Python, slow startup, crashed FFmpeg, long media, cancel and application close each leave a usable UI and no orphan owned processes. |
 | UI-05 | P1 / NOT TESTED sizing and layout persistence | Toolbar has many minimum-width buttons plus 250px command box; sidebar min width 320, output min height 220, nested scroll/toolbox. `finishUiSetup` still reopens/redocks AI after every restore despite one-time migration comment. Clipping is a hypothesis until visually reproduced; forced reopening is confirmed code behavior. | `creator-workspace-filmora.patch`, `creator-layout-filmora.patch`, `creator-layout-reset.patch`, `ai-agent-sidebar.patch`, `ai-agent-toolbox.patch`. Capture real screenshots before changing geometry. Keep AI default on right; define migration separately from later user layout persistence. | Matrix below: reachable controls, no overlap, monitor/timeline usable, intended persistence after restart, Layout reset preserves project/undo and does not duplicate panels. |
 | UI-06 | P1 / CONFIRMED no explicit request timeout | `sendTurn` posts without a transfer/deadline timer; stalled API can leave busy state indefinitely until user cancel. | Add configurable bounded request policy with local stalled HTTP fixture; invalidate old reply before timeout abort. Never automatically replay editing tool calls. | Stalled connection releases busy state within configured bound; useful timeout message; subsequent run succeeds; normal long local model response is supported intentionally. |
@@ -85,8 +86,9 @@ first pass; use a local delayed/error HTTP fixture for network lifecycle tests.
 4. For UI-01/02 run the standalone Qt test using the actual reconstructed agent and
    registry (instructions in tests/qt-agent/README.md). Existing source gate also
    compiles/runs it. It requires no API account and does not verify full editor UI.
-5. Prioritize UI-03 async process contract and UI-10 real screenshot/heartbeat
-   evidence, then UI-05 geometry/persistence and UI-08 reopen/export. Keep focused PRs.
+5. Finish UI-03 PR/source/Windows verification first. Then prioritize UI-10 real
+   screenshot/heartbeat evidence and UI-04 remaining blocking call sites; follow
+   with UI-05 geometry/persistence and UI-08 reopen/export. Keep focused PRs.
 6. Before merging: relevant tests, complete diff review, all quality gates green;
    after merging track exact-source Windows build separately. Preserve active builds.
 7. Update this file with completed IDs, exact tests and unresolved risks. Do not mark

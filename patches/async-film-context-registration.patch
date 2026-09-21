@@ -1,0 +1,106 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -1665,19 +1758,24 @@
+         m_filmContextStatus->setText(i18n("Disabled · no movie data is exposed to the API"));
+         return;
+     }
+-    const QJsonObject result = invokeFilmContextTool(QStringLiteral("movie_context_status"), QJsonObject{});
+-    if (!result.value(QStringLiteral("ok")).toBool()) {
+-        m_filmContextStatus->setText(i18n("Enabled · %1", result.value(QStringLiteral("error")).toString()));
+-        return;
+-    }
+-    const int sceneCount = result.value(QStringLiteral("scene_count")).toInt();
+-    const int subtitleCount = result.value(QStringLiteral("subtitle_count")).toInt();
+-    const int visualCount = result.value(QStringLiteral("visual_scene_count")).toInt();
+-    if (visualCount > 0) {
+-        m_filmContextStatus->setText(i18n("READY · %1 scenes · %2 subtitles · visual tags %3/%1 · local index", sceneCount, subtitleCount, visualCount));
+-    } else {
+-        m_filmContextStatus->setText(i18n("READY · %1 scenes · %2 subtitles · visual tags optional", sceneCount, subtitleCount));
+-    }
++    m_filmContextStatus->setText(i18n("Checking local Film Context index…"));
++    startFilmContextTool(QStringLiteral("movie_context_status"), QJsonObject{}, [this](const QJsonObject &result) {
++        if (!m_filmContextStatus || !m_filmContextEnabled || !m_filmContextEnabled->isChecked()) {
++            return;
++        }
++        if (!result.value(QStringLiteral("ok")).toBool()) {
++            m_filmContextStatus->setText(i18n("Enabled · %1", result.value(QStringLiteral("error")).toString()));
++            return;
++        }
++        const int sceneCount = result.value(QStringLiteral("scene_count")).toInt();
++        const int subtitleCount = result.value(QStringLiteral("subtitle_count")).toInt();
++        const int visualCount = result.value(QStringLiteral("visual_scene_count")).toInt();
++        if (visualCount > 0) {
++            m_filmContextStatus->setText(i18n("READY · %1 scenes · %2 subtitles · visual tags %3/%1 · local index", sceneCount, subtitleCount, visualCount));
++        } else {
++            m_filmContextStatus->setText(i18n("READY · %1 scenes · %2 subtitles · visual tags optional", sceneCount, subtitleCount));
++        }
++    });
+ }
+ 
+ void AiAssistantWidget::registerTools()
+@@ -1685,12 +1783,14 @@
+     const QJsonObject stringProperty{{QStringLiteral("type"), QStringLiteral("string")}};
+ 
+     const QJsonObject filmSceneIdProperty{{QStringLiteral("type"), QStringLiteral("integer")}, {QStringLiteral("minimum"), 1}};
+-    m_registry->registerTool(
++    m_registry->registerAsyncTool(
+         QStringLiteral("movie_context_status"),
+         QStringLiteral("Inspect the optional local Film Context index. This never calls an API and never edits the timeline."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}, {QStringLiteral("properties"), QJsonObject{}}},
+-        [this](const QJsonObject &arguments) { return invokeFilmContextTool(QStringLiteral("movie_context_status"), arguments); });
+-    m_registry->registerTool(
++        [this](const QJsonObject &arguments, AgentToolRegistry::Completion completion) {
++            return startFilmContextTool(QStringLiteral("movie_context_status"), arguments, std::move(completion));
++        });
++    m_registry->registerAsyncTool(
+         QStringLiteral("movie_search"),
+         QStringLiteral("Search the local movie index first. Returns a small ranked scene list with timestamps/dialogue; prefer this before asking for images."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
+@@ -1699,15 +1799,19 @@
+                                  {QStringLiteral("top_k"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}, {QStringLiteral("minimum"), 1}, {QStringLiteral("maximum"), 20}}},
+                                  {QStringLiteral("near_scene"), filmSceneIdProperty}}},
+                     {QStringLiteral("required"), QJsonArray{QStringLiteral("query")}}},
+-        [this](const QJsonObject &arguments) { return invokeFilmContextTool(QStringLiteral("movie_search"), arguments); });
+-    m_registry->registerTool(
++        [this](const QJsonObject &arguments, AgentToolRegistry::Completion completion) {
++            return startFilmContextTool(QStringLiteral("movie_search"), arguments, std::move(completion));
++        });
++    m_registry->registerAsyncTool(
+         QStringLiteral("movie_get_scene"),
+         QStringLiteral("Read one candidate source scene's timestamp and subtitle/dialogue context from the local Film Context index."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
+                     {QStringLiteral("properties"), QJsonObject{{QStringLiteral("scene_id"), filmSceneIdProperty}}},
+                     {QStringLiteral("required"), QJsonArray{QStringLiteral("scene_id")}}},
+-        [this](const QJsonObject &arguments) { return invokeFilmContextTool(QStringLiteral("movie_get_scene"), arguments); });
+-    m_registry->registerTool(
++        [this](const QJsonObject &arguments, AgentToolRegistry::Completion completion) {
++            return startFilmContextTool(QStringLiteral("movie_get_scene"), arguments, std::move(completion));
++        });
++    m_registry->registerAsyncTool(
+         QStringLiteral("movie_get_context"),
+         QStringLiteral("Read a small previous/current/next scene window around a candidate. Use this instead of reading the whole movie."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
+@@ -1715,8 +1819,10 @@
+                      QJsonObject{{QStringLiteral("scene_id"), filmSceneIdProperty},
+                                  {QStringLiteral("radius"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}, {QStringLiteral("minimum"), 0}, {QStringLiteral("maximum"), 10}}}}},
+                     {QStringLiteral("required"), QJsonArray{QStringLiteral("scene_id")}}},
+-        [this](const QJsonObject &arguments) { return invokeFilmContextTool(QStringLiteral("movie_get_context"), arguments); });
+-    m_registry->registerTool(
++        [this](const QJsonObject &arguments, AgentToolRegistry::Completion completion) {
++            return startFilmContextTool(QStringLiteral("movie_get_context"), arguments, std::move(completion));
++        });
++    m_registry->registerAsyncTool(
+         QStringLiteral("movie_get_keyframes"),
+         QStringLiteral("Generate a few local keyframes only for finalist candidate scenes. Use only when text/context is insufficient; vision frames may be attached when visual inspection is enabled."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
+@@ -1724,7 +1830,9 @@
+                      QJsonObject{{QStringLiteral("scene_ids"), QJsonObject{{QStringLiteral("type"), QStringLiteral("array")}, {QStringLiteral("items"), filmSceneIdProperty}, {QStringLiteral("minItems"), 1}, {QStringLiteral("maxItems"), 10}}},
+                                  {QStringLiteral("count_per_scene"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}, {QStringLiteral("minimum"), 1}, {QStringLiteral("maximum"), 4}}}}},
+                     {QStringLiteral("required"), QJsonArray{QStringLiteral("scene_ids")}}},
+-        [this](const QJsonObject &arguments) { return invokeFilmContextTool(QStringLiteral("movie_get_keyframes"), arguments); });
++        [this](const QJsonObject &arguments, AgentToolRegistry::Completion completion) {
++            return startFilmContextTool(QStringLiteral("movie_get_keyframes"), arguments, std::move(completion));
++        });
+ 
+     m_registry->registerTool(
+         QStringLiteral("kdenlive_list_actions"),

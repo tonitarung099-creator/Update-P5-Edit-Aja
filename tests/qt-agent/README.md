@@ -14,8 +14,12 @@ ctest --test-dir build/qt-agent --output-on-failure
 The existing Source / Reconstruction gate runs this suite after reconstruction.
 Cases: duplicate Run preserves active busy state and sends one HTTP request;
 Cancel/repeated Cancel/restart cannot report stale failure or completion; genuine
-invalid API JSON still reports failure and restores idle.
+invalid API JSON still reports failure and restores idle; a delayed asynchronous
+tool keeps a Qt heartbeat running before the follow-up API turn; cancelling that
+tool prevents stale completion and a fresh request can finish normally.
 
 This does not compile the full AiAssistantWidget or validate screen geometry,
-Windows DPI, native tool cancellation or event-loop responsiveness while a native
-handler blocks. Follow `docs/ai/UI_STABILITY_HANDOFF.md` for those tests.
+Windows DPI, or the real Film Context process tree inside a packaged Windows app.
+It does verify the production AgentToolRegistry/OpenAiCompatibleAgent async job
+contract without a cloud API. Follow `docs/ai/UI_STABILITY_HANDOFF.md` for
+packaged UI evidence.
