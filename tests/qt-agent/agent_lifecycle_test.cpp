@@ -113,6 +113,119 @@ private Q_SLOTS:
         QVERIFY(!busy.last().at(0).toBool());
         QVERIFY(failed.at(0).at(0).toString().contains(QStringLiteral("invalid JSON")));
     }
+    void asyncToolKeepsEventLoopResponsiveAndCompletesAgent()
+    {
+        HttpFixture http;
+        QVERIFY(http.server.listen(QHostAddress::LocalHost, 0));
+        AgentToolRegistry registry;
+        int toolStarts = 0;
+        registry.registerAsyncTool(
+            QStringLiteral("slow_fixture"),
+            QStringLiteral("Delayed local fixture"),
+            QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}},
+            [&registry, &toolStarts](const QJsonObject &, AgentToolRegistry::Completion completion) {
+                ++toolStarts;
+                auto *timer = new QTimer(&registry);
+                timer->setSingleShot(true);
+                QPointer<QTimer> guard(timer);
+                QObject::connect(timer, &QTimer::timeout, &registry, [guard, completion]() {
+                    if (!guard) {
+                        return;
+                    }
+                    completion(QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("value"), QStringLiteral("async done")}});
+                    guard->deleteLater();
+                });
+                timer->start(180);
+                return [guard]() {
+                    if (guard) {
+                        guard->stop();
+                        guard->deleteLater();
+                    }
+                };
+            });
+
+        OpenAiCompatibleAgent agent(&registry);
+        agent.configure(http.url(), QStringLiteral("fixture"), {});
+        QSignalSpy failed(&agent, &OpenAiCompatibleAgent::failed);
+        QSignalSpy finished(&agent, &OpenAiCompatibleAgent::finished);
+        agent.run(QStringLiteral("use slow fixture"), false);
+        QTRY_COMPARE(http.requests.size(), 1);
+
+        QTimer heartbeat;
+        int heartbeatTicks = 0;
+        QObject::connect(&heartbeat, &QTimer::timeout, this, [&heartbeatTicks]() { ++heartbeatTicks; });
+        heartbeat.start(10);
+        http.respond(0, R"json({"choices":[{"message":{"role":"assistant","content":"","tool_calls":[{"id":"call-async","type":"function","function":{"name":"slow_fixture","arguments":"{}"}}]}}]})json");
+        QTRY_COMPARE(toolStarts, 1);
+        const int ticksAtStart = heartbeatTicks;
+        QTRY_VERIFY(heartbeatTicks >= ticksAtStart + 5);
+        QCOMPARE(http.requests.size(), 1);
+        QTRY_COMPARE(http.requests.size(), 2);
+        heartbeat.stop();
+        QVERIFY(heartbeatTicks >= ticksAtStart + 5);
+
+        http.respond(1, R"json({"choices":[{"message":{"role":"assistant","content":"async completed"}}]})json");
+        QTRY_COMPARE(finished.size(), 1);
+        QCOMPARE(finished.at(0).at(0).toString(), QStringLiteral("async completed"));
+        QCOMPARE(failed.size(), 0);
+    }
+
+    void cancelAsyncToolThenRestartDoesNotLeakCompletion()
+    {
+        HttpFixture http;
+        QVERIFY(http.server.listen(QHostAddress::LocalHost, 0));
+        AgentToolRegistry registry;
+        int toolStarts = 0;
+        int toolCancels = 0;
+        registry.registerAsyncTool(
+            QStringLiteral("slow_fixture"),
+            QStringLiteral("Cancellable delayed fixture"),
+            QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}},
+            [&registry, &toolStarts, &toolCancels](const QJsonObject &, AgentToolRegistry::Completion completion) {
+                ++toolStarts;
+                auto *timer = new QTimer(&registry);
+                timer->setSingleShot(true);
+                QPointer<QTimer> guard(timer);
+                QObject::connect(timer, &QTimer::timeout, &registry, [guard, completion]() {
+                    if (!guard) {
+                        return;
+                    }
+                    completion(QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("value"), QStringLiteral("stale completion")}});
+                    guard->deleteLater();
+                });
+                timer->start(500);
+                return [guard, &toolCancels]() {
+                    ++toolCancels;
+                    if (guard) {
+                        guard->stop();
+                        guard->deleteLater();
+                    }
+                };
+            });
+
+        OpenAiCompatibleAgent agent(&registry);
+        agent.configure(http.url(), QStringLiteral("fixture"), {});
+        QSignalSpy failed(&agent, &OpenAiCompatibleAgent::failed);
+        QSignalSpy finished(&agent, &OpenAiCompatibleAgent::finished);
+
+        agent.run(QStringLiteral("start cancellable tool"), false);
+        QTRY_COMPARE(http.requests.size(), 1);
+        http.respond(0, R"json({"choices":[{"message":{"role":"assistant","content":"","tool_calls":[{"id":"call-cancel","type":"function","function":{"name":"slow_fixture","arguments":"{}"}}]}}]})json");
+        QTRY_COMPARE(toolStarts, 1);
+        agent.cancel();
+        QCOMPARE(toolCancels, 1);
+        QTest::qWait(600);
+        QCOMPARE(http.requests.size(), 1);
+        QCOMPARE(failed.size(), 0);
+        QCOMPARE(finished.size(), 0);
+
+        agent.run(QStringLiteral("fresh request"), false);
+        QTRY_COMPARE(http.requests.size(), 2);
+        http.respond(1, R"json({"choices":[{"message":{"role":"assistant","content":"fresh completed"}}]})json");
+        QTRY_COMPARE(finished.size(), 1);
+        QCOMPARE(finished.at(0).at(0).toString(), QStringLiteral("fresh completed"));
+        QCOMPARE(failed.size(), 0);
+    }
 };
 QTEST_GUILESS_MAIN(AgentLifecycleTest)
 #include "agent_lifecycle_test.moc"
