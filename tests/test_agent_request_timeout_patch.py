@@ -16,15 +16,13 @@ class AgentRequestTimeoutPatchTests(unittest.TestCase):
         cls.manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         cls.blueprint = BLUEPRINT.read_text(encoding="utf-8")
 
-    def test_timeout_is_bounded_and_configurable(self):
+    def test_timeout_is_bounded_and_programmatically_configurable(self):
         for marker in (
             "setRequestTimeoutMs",
             "m_requestTimeoutMs{600000}",
             "m_requestTimer->setSingleShot(true)",
             "m_requestTimer->start(m_requestTimeoutMs)",
             "handleRequestTimeout",
-            "requestTimeoutSeconds",
-            "setRange(15, 3600)",
         ):
             self.assertIn(marker, self.patch)
 
@@ -39,14 +37,6 @@ class AgentRequestTimeoutPatchTests(unittest.TestCase):
     def test_cancel_and_failure_stop_request_timer(self):
         self.assertGreaterEqual(self.patch.count("m_requestTimer->stop();"), 3)
         self.assertIn("API request timed out after %1 seconds", self.patch)
-
-    def test_ui_persists_timeout_and_applies_it_before_run(self):
-        self.assertIn('settings.setValue(QStringLiteral("requestTimeoutSeconds")', self.patch)
-        configure_pos = self.patch.index("m_agent->configure")
-        timeout_pos = self.patch.index("m_agent->setRequestTimeoutMs", configure_pos)
-        run_pos = self.patch.index("m_agent->run", timeout_pos)
-        self.assertLess(configure_pos, timeout_pos)
-        self.assertLess(timeout_pos, run_pos)
 
     def test_patch_is_last_and_copied_to_craft(self):
         entry = self.manifest["apply_chain"][-1]
