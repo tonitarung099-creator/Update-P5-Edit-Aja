@@ -49,6 +49,7 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"startFilmContextTool", "Event-driven Film Context process path"),
     ("src/aiassistant/aiassistantwidget.cpp", r"QProcess::started", "Film Context process started signal"),
     ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncTool\(\s*QStringLiteral\(\"movie_search\"\)", "Film Context tools registered asynchronously"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"m_filmContextIndexer, &QProcess::errorOccurred", "Nonblocking Film Context indexer startup error path"),
 ]
 
 
