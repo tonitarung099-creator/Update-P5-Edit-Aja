@@ -125,7 +125,7 @@
  class QTextBrowser;
  class QProcess;
  
-@@ -92,6 +93,7 @@
+@@ -95,6 +96,7 @@
      QLineEdit *m_apiUrl{nullptr};
      QLineEdit *m_model{nullptr};
      QLineEdit *m_apiKey{nullptr};
@@ -157,7 +157,7 @@
      m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
      m_fullAccess->setChecked(true);
      m_fullAccess->setToolTip(i18n("When enabled, the API model can use native editing tools and trigger any action exposed by Update P5 Edit Aja. Use Undo/versioned project files for reversible work."));
-@@ -1576,6 +1584,7 @@
+@@ -1585,6 +1593,7 @@
      QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
      settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
      settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
@@ -165,7 +165,7 @@
  
      m_output->clear();
      appendTrace(QStringLiteral("<b>%1</b> %2").arg(i18n("You:"), prompt.toHtmlEscaped()));
-@@ -1587,6 +1596,7 @@
+@@ -1596,6 +1605,7 @@
      }
  
      m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
