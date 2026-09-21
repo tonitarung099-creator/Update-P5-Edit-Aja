@@ -1,0 +1,252 @@
+--- a/src/aiassistant/aiassistantwidget.h
++++ b/src/aiassistant/aiassistantwidget.h
+@@ -77,7 +77,8 @@
+     void setBusy(bool busy);
+     QString filmContextScriptPath() const;
+     QString filmContextPythonPath() const;
+-    QJsonObject invokeFilmContextTool(const QString &tool, const QJsonObject &arguments) const;
++    std::function<void()> startFilmContextTool(const QString &tool, const QJsonObject &arguments,
++                                               std::function<void(const QJsonObject &)> completion);
+     void refreshFilmContextStatus();
+ 
+     QLineEdit *m_prompt{nullptr};
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -36,6 +36,7 @@
+ #include <QLineEdit>
+ #include <QPushButton>
+ #include <QProcess>
++#include <QPointer>
+ #include <QRegularExpression>
+ #include <QScrollArea>
+ #include <QSizePolicy>
+@@ -43,12 +44,34 @@
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
++#include <QTimer>
+ #include <QToolBox>
+ #include <QStringList>
+ #include <QVBoxLayout>
+ #include <QVector>
+ 
+ namespace {
++void stopOwnedProcessTree(QProcess *process)
++{
++    if (!process || process->state() == QProcess::NotRunning) {
++        return;
++    }
++    const qint64 pid = process->processId();
++#ifdef Q_OS_WIN
++    if (pid > 0) {
++        QProcess::startDetached(QStringLiteral("taskkill"),
++                                QStringList{QStringLiteral("/PID"), QString::number(pid), QStringLiteral("/T"), QStringLiteral("/F")});
++    }
++#else
++    // Best-effort child cleanup for non-Windows developer/test hosts. The Windows
++    // product build uses taskkill /T for the owned Python/FFmpeg process tree.
++    if (pid > 0) {
++        QProcess::startDetached(QStringLiteral("pkill"), QStringList{QStringLiteral("-TERM"), QStringLiteral("-P"), QString::number(pid)});
++    }
++#endif
++    process->kill();
++}
++
+ QJsonValue aiEditValueAtPath(const QJsonValue &root, const QString &path, QString *error)
+ {
+     QJsonValue current = root;
+@@ -1586,74 +1609,144 @@
+     return python;
+ }
+ 
+-QJsonObject AiAssistantWidget::invokeFilmContextTool(const QString &tool, const QJsonObject &arguments) const
++std::function<void()> AiAssistantWidget::startFilmContextTool(const QString &tool, const QJsonObject &arguments,
++                                                               std::function<void(const QJsonObject &)> completion)
+ {
++    auto completeSoon = [this, completion](const QJsonObject &result) {
++        QTimer::singleShot(0, this, [completion, result]() { completion(result); });
++    };
+     if (!m_filmContextEnabled || !m_filmContextEnabled->isChecked()) {
+-        return QJsonObject{{QStringLiteral("ok"), false},
+-                           {QStringLiteral("error"), QStringLiteral("Film Context is disabled. Enable the optional plugin in AI Assistant first.")},
+-                           {QStringLiteral("api_used"), false}};
++        completeSoon(QJsonObject{{QStringLiteral("ok"), false},
++                                 {QStringLiteral("error"), QStringLiteral("Film Context is disabled. Enable the optional plugin in AI Assistant first.")},
++                                 {QStringLiteral("api_used"), false}});
++        return {};
+     }
+     const QString indexPath = m_filmContextIndexPath ? m_filmContextIndexPath->text().trimmed() : QString();
+     if (indexPath.isEmpty() || !QFileInfo::exists(QDir(indexPath).filePath(QStringLiteral("movie.db")))) {
+-        return QJsonObject{{QStringLiteral("ok"), false},
+-                           {QStringLiteral("error"), QStringLiteral("Choose or build a valid Film Context index first.")},
+-                           {QStringLiteral("api_used"), false}};
++        completeSoon(QJsonObject{{QStringLiteral("ok"), false},
++                                 {QStringLiteral("error"), QStringLiteral("Choose or build a valid Film Context index first.")},
++                                 {QStringLiteral("api_used"), false}});
++        return {};
+     }
+     const QString python = filmContextPythonPath();
+     const QString script = filmContextScriptPath();
+     if (python.isEmpty() || script.isEmpty()) {
+-        return QJsonObject{{QStringLiteral("ok"), false},
+-                           {QStringLiteral("error"), QStringLiteral("Film Context Python backend is not available.")},
+-                           {QStringLiteral("api_used"), false}};
++        completeSoon(QJsonObject{{QStringLiteral("ok"), false},
++                                 {QStringLiteral("error"), QStringLiteral("Film Context Python backend is not available.")},
++                                 {QStringLiteral("api_used"), false}});
++        return {};
+     }
+ 
+-    QProcess process;
+-    process.setProcessChannelMode(QProcess::SeparateChannels);
+-    const QString argumentJson = QString::fromUtf8(QJsonDocument(arguments).toJson(QJsonDocument::Compact));
+-    process.start(python, QStringList{script, QStringLiteral("tool-call"), tool, QStringLiteral("--index-dir"), indexPath,
+-                                     QStringLiteral("--arguments"), argumentJson});
+-    if (!process.waitForStarted(3000)) {
+-        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Could not start Film Context backend.")}};
+-    }
++    auto *process = new QProcess(this);
++    process->setProcessChannelMode(QProcess::SeparateChannels);
++    auto *startupTimer = new QTimer(process);
++    startupTimer->setSingleShot(true);
++    auto *deadlineTimer = new QTimer(process);
++    deadlineTimer->setSingleShot(true);
+     const int timeout = tool == QLatin1String("movie_get_keyframes") ? 120000 : 30000;
+-    if (!process.waitForFinished(timeout)) {
+-        process.kill();
+-        process.waitForFinished(2000);
+-        return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Film Context tool timed out.")}};
+-    }
+-    const QByteArray stdoutBytes = process.readAllStandardOutput();
+-    const QByteArray stderrBytes = process.readAllStandardError();
+-    QJsonParseError parseError;
+-    const QJsonDocument document = QJsonDocument::fromJson(stdoutBytes, &parseError);
+-    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+-        return QJsonObject{{QStringLiteral("ok"), false},
+-                           {QStringLiteral("error"), QStringLiteral("Film Context returned invalid JSON: %1").arg(QString::fromUtf8(stderrBytes.left(1000)))}};
+-    }
+-    QJsonObject result = document.object();
+-    if (tool == QLatin1String("movie_get_keyframes") && result.value(QStringLiteral("ok")).toBool()) {
+-        QJsonArray imagePaths;
+-        const QJsonArray scenes = result.value(QStringLiteral("scenes")).toArray();
+-        for (const auto &sceneValue : scenes) {
+-            const QJsonArray frames = sceneValue.toObject().value(QStringLiteral("frames")).toArray();
+-            for (const auto &frameValue : frames) {
+-                const QString path = frameValue.toObject().value(QStringLiteral("path")).toString();
+-                if (!path.isEmpty() && QFileInfo::exists(path)) {
+-                    imagePaths.push_back(path);
+-                    if (imagePaths.size() >= 6) {
+-                        break;
++    QPointer<QProcess> guardedProcess(process);
++
++    auto finish = [guardedProcess, completion, tool](const QJsonObject &inputResult) {
++        if (!guardedProcess || guardedProcess->property("editAjaToolCompleted").toBool()) {
++            return;
++        }
++        guardedProcess->setProperty("editAjaToolCompleted", true);
++        if (guardedProcess->property("editAjaToolCancelled").toBool()) {
++            guardedProcess->deleteLater();
++            return;
++        }
++
++        QJsonObject result = inputResult;
++        if (tool == QLatin1String("movie_get_keyframes") && result.value(QStringLiteral("ok")).toBool()) {
++            QJsonArray imagePaths;
++            const QJsonArray scenes = result.value(QStringLiteral("scenes")).toArray();
++            for (const auto &sceneValue : scenes) {
++                const QJsonArray frames = sceneValue.toObject().value(QStringLiteral("frames")).toArray();
++                for (const auto &frameValue : frames) {
++                    const QString path = frameValue.toObject().value(QStringLiteral("path")).toString();
++                    if (!path.isEmpty() && QFileInfo::exists(path)) {
++                        imagePaths.push_back(path);
++                        if (imagePaths.size() >= 6) {
++                            break;
++                        }
+                     }
+                 }
++                if (imagePaths.size() >= 6) {
++                    break;
++                }
+             }
+-            if (imagePaths.size() >= 6) {
+-                break;
++            if (!imagePaths.isEmpty()) {
++                result.insert(QStringLiteral("agent_image_paths"), imagePaths);
++                result.insert(QStringLiteral("agent_image_path"), imagePaths.first());
+             }
+         }
+-        if (!imagePaths.isEmpty()) {
+-            result.insert(QStringLiteral("agent_image_paths"), imagePaths);
+-            result.insert(QStringLiteral("agent_image_path"), imagePaths.first());
++        completion(result);
++        guardedProcess->deleteLater();
++    };
++
++    connect(startupTimer, &QTimer::timeout, process, [guardedProcess, finish]() {
++        if (!guardedProcess) {
++            return;
+         }
+-    }
+-    return result;
++        stopOwnedProcessTree(guardedProcess);
++        finish(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Could not start Film Context backend within 3 seconds.")}});
++    });
++    connect(deadlineTimer, &QTimer::timeout, process, [guardedProcess, finish]() {
++        if (!guardedProcess) {
++            return;
++        }
++        stopOwnedProcessTree(guardedProcess);
++        finish(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Film Context tool timed out.")}});
++    });
++    connect(process, &QProcess::started, process, [startupTimer, deadlineTimer, timeout]() {
++        startupTimer->stop();
++        deadlineTimer->start(timeout);
++    });
++    connect(process, &QProcess::errorOccurred, process, [finish](QProcess::ProcessError error) {
++        if (error == QProcess::FailedToStart) {
++            finish(QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Could not start Film Context backend.")}});
++        }
++    });
++    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), process,
++            [guardedProcess, startupTimer, deadlineTimer, finish](int exitCode, QProcess::ExitStatus exitStatus) {
++                startupTimer->stop();
++                deadlineTimer->stop();
++                if (!guardedProcess || guardedProcess->property("editAjaToolCancelled").toBool()) {
++                    if (guardedProcess) {
++                        guardedProcess->setProperty("editAjaToolCompleted", true);
++                        guardedProcess->deleteLater();
++                    }
++                    return;
++                }
++                const QByteArray stdoutBytes = guardedProcess->readAllStandardOutput();
++                const QByteArray stderrBytes = guardedProcess->readAllStandardError();
++                if (exitStatus != QProcess::NormalExit || exitCode != 0) {
++                    finish(QJsonObject{{QStringLiteral("ok"), false},
++                                       {QStringLiteral("error"), QStringLiteral("Film Context backend failed: %1").arg(QString::fromUtf8(stderrBytes.left(1000)))}});
++                    return;
++                }
++                QJsonParseError parseError;
++                const QJsonDocument document = QJsonDocument::fromJson(stdoutBytes, &parseError);
++                if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
++                    finish(QJsonObject{{QStringLiteral("ok"), false},
++                                       {QStringLiteral("error"), QStringLiteral("Film Context returned invalid JSON: %1").arg(QString::fromUtf8(stderrBytes.left(1000)))}});
++                    return;
++                }
++                finish(document.object());
++            });
++
++    const QString argumentJson = QString::fromUtf8(QJsonDocument(arguments).toJson(QJsonDocument::Compact));
++    process->start(python, QStringList{script, QStringLiteral("tool-call"), tool, QStringLiteral("--index-dir"), indexPath,
++                                      QStringLiteral("--arguments"), argumentJson});
++    startupTimer->start(3000);
++
++    return [guardedProcess]() {
++        if (!guardedProcess || guardedProcess->property("editAjaToolCompleted").toBool()) {
++            return;
++        }
++        guardedProcess->setProperty("editAjaToolCancelled", true);
++        stopOwnedProcessTree(guardedProcess);
++    };
+ }
+ 
+ void AiAssistantWidget::refreshFilmContextStatus()
