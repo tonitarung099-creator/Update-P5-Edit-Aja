@@ -254,6 +254,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "agent-request-timeout-ui",
+      "path": "patches/agent-request-timeout-ui.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -356,6 +363,10 @@
     {
       "source": "patches/agent-request-timeout.patch",
       "destination": "craft/editaja/agent-request-timeout.patch"
+    },
+    {
+      "source": "patches/agent-request-timeout-ui.patch",
+      "destination": "craft/editaja/agent-request-timeout-ui.patch"
     }
   ]
 }

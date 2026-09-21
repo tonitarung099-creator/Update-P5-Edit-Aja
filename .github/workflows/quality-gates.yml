@@ -66,6 +66,7 @@ jobs:
               tests.test_nonblocking_film_context_indexer_patch
               tests.test_async_native_analysis_patch
               tests.test_agent_request_timeout_patch
+              tests.test_agent_request_timeout_ui_patch
               tests.test_keyframe_api_compile_fix
               tests.test_phase_integration
               tests.test_workflow_presets

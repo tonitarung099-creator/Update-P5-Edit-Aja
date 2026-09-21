@@ -1,0 +1,43 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -41,6 +41,7 @@
+ #include <QScrollArea>
+ #include <QSizePolicy>
+ #include <QSet>
++#include <QSpinBox>
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
+@@ -565,4 +566,16 @@
+     m_attachVisionFrames->setChecked(false);
+     m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next API turn. Leave this off for text-only models."));
+     apiForm->addRow(QString(), m_attachVisionFrames);
++
++    auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
++    requestTimeoutSeconds->setObjectName(QStringLiteral("agentRequestTimeoutSeconds"));
++    requestTimeoutSeconds->setRange(15, 3600);
++    requestTimeoutSeconds->setValue(qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600));
++    requestTimeoutSeconds->setSuffix(i18n(" s"));
++    requestTimeoutSeconds->setToolTip(i18n("Maximum wait for each API model response. Increase this for slower local models. Tool jobs have their own cancellation and deadline rules."));
++    apiForm->addRow(i18n("Request timeout"), requestTimeoutSeconds);
++    connect(requestTimeoutSeconds, qOverload<int>(&QSpinBox::valueChanged), this, [](int seconds) {
++        QSettings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent")).setValue(QStringLiteral("requestTimeoutSeconds"), seconds);
++    });
++
+     toolBox->addItem(apiGroup, i18n("API"));
+@@ -1585,6 +1597,7 @@
+     QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
+     settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
+     settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
++    const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
+ 
+     m_output->clear();
+     appendTrace(QStringLiteral("<b>%1</b> %2").arg(i18n("You:"), prompt.toHtmlEscaped()));
+@@ -1596,6 +1609,7 @@
+     }
+ 
+     m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
++    m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000);
+     const int maxRounds = m_autonomousMode->isChecked() ? 96 : 32;
+     m_agent->run(prompt, m_fullAccess->isChecked(), maxRounds, m_attachVisionFrames->isChecked());
+ }
