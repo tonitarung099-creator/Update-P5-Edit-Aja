@@ -7,58 +7,62 @@ if (-not $env:CRAFT_BUILD_TYPE) {
     $env:CRAFT_BUILD_TYPE = 'RelWithDebInfo'
 }
 
-New-Item -ItemType Directory -Force 'artifacts/windows' | Out-Null
-$binaryCount = 0
+$artifactRoot = Join-Path (Get-Location) 'artifacts/windows'
+New-Item -ItemType Directory -Force $artifactRoot | Out-Null
+Get-ChildItem $artifactRoot -File -ErrorAction SilentlyContinue | Remove-Item -Force
+
 $craft = Enter-CraftEnvironment
 
-# packageDestinationDir() is a convenience query. If Craft changes the query
-# interface, the fallback search below still finds a successfully built package.
+# PortablePackager writes into Craft's normal package destination. Query it
+# first, then fall back to CraftRoot only if Craft changes this helper.
 $previousNativePreference = $PSNativeCommandUseErrorActionPreference
 $PSNativeCommandUseErrorActionPreference = $false
 $packageDirOutput = & python $craft --ci-mode --buildtype $env:CRAFT_BUILD_TYPE -q --get 'packageDestinationDir()' virtual/base 2>$null
 $queryExitCode = $LASTEXITCODE
 $PSNativeCommandUseErrorActionPreference = $previousNativePreference
 
-$packageDir = ''
+$searchRoots = @()
 if ($queryExitCode -eq 0 -and $packageDirOutput) {
     $packageDir = "$($packageDirOutput | Select-Object -Last 1)".Trim()
-}
-
-if ($packageDir -and (Test-Path $packageDir)) {
-    Write-Host "Craft package directory: $packageDir"
-    $packages = Get-ChildItem $packageDir -Recurse -File -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Extension -in '.exe', '.zip', '.7z', '.sha256' -and
-            ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
-        }
-
-    foreach ($item in $packages) {
-        Copy-Item $item.FullName (Join-Path 'artifacts/windows' $item.Name) -Force
-        if ($item.Extension -in '.exe', '.zip', '.7z') {
-            $binaryCount++
-        }
+    if ($packageDir -and (Test-Path $packageDir)) {
+        Write-Host "Craft package directory: $packageDir"
+        $searchRoots += $packageDir
     }
 }
+if (Test-Path $env:CRAFT_ROOT) {
+    $searchRoots += $env:CRAFT_ROOT
+}
 
-if ($binaryCount -eq 0 -and (Test-Path $env:CRAFT_ROOT)) {
-    Write-Host 'Craft package directory query produced no runnable package; using fallback search.'
-    $packages = Get-ChildItem $env:CRAFT_ROOT -Recurse -File -ErrorAction SilentlyContinue |
+$portable = $null
+foreach ($root in ($searchRoots | Select-Object -Unique)) {
+    $portable = Get-ChildItem $root -Recurse -File -Filter '*.zip' -ErrorAction SilentlyContinue |
         Where-Object {
-            $_.Extension -in '.exe', '.zip', '.7z' -and
-            ($_.Name -match 'edit.?aja' -or $_.Name -match 'editaja')
+            $_.Name -match 'edit.?aja' -and
+            $_.Name -notmatch '(?i)(-src|-logs|-dbg)'
         } |
-        Select-Object -First 10
-
-    foreach ($item in $packages) {
-        Copy-Item $item.FullName (Join-Path 'artifacts/windows' $item.Name) -Force
-        $binaryCount++
-    }
+        Sort-Object Length -Descending |
+        Select-Object -First 1
+    if ($portable) { break }
 }
 
-Get-ChildItem 'artifacts/windows' -File | Format-Table Name, Length
+if (-not $portable) {
+    throw 'No portable Edit Aja ZIP was produced by Craft.'
+}
 
-if ($binaryCount -eq 0) {
-    throw 'No runnable Update P5 Edit Aja Windows package was produced.'
+$portableName = 'Update-P5-Edit-Aja-Portable-Windows-x64.zip'
+$destination = Join-Path $artifactRoot $portableName
+Copy-Item $portable.FullName $destination -Force
+
+$hash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+"$hash  $portableName" | Set-Content -LiteralPath "$destination.sha256" -Encoding ascii
+
+Write-Host "Portable source: $($portable.FullName)"
+Write-Host "Portable artifact: $destination"
+Write-Host "SHA-256: $hash"
+Get-ChildItem $artifactRoot -File | Format-Table Name, Length
+
+if (Get-ChildItem $artifactRoot -File -Filter '*.exe' -ErrorAction SilentlyContinue) {
+    throw 'Portable artifact directory unexpectedly contains an installer EXE.'
 }
 
 $global:LASTEXITCODE = 0

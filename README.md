@@ -18,9 +18,16 @@ The repository retains the complete Phase 1–5 Edit Aja work:
 - shared native `kdenlive_*` editing tool registry,
 - project/timeline/media/effect/subtitle/render tools,
 - local transcription and silence/jump-cut primitives,
-- Edit Aja branding and Windows packaging workflow.
+- Edit Aja branding and portable-only Windows ZIP workflow.
 
 The internal `kdenlive_*` names intentionally remain for Phase 5 API compatibility.
+
+### Windows portable build
+
+Windows releases are portable-only. Extract
+`Update-P5-Edit-Aja-Portable-Windows-x64.zip` and run
+`bin\kdenlive.exe`. The project does not require or produce an installer,
+registry installation, Start-menu entry, or uninstaller.
 
 ## Phase 6: AI Edit JSON
 
