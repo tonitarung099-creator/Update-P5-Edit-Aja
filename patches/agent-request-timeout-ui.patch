@@ -8,10 +8,11 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -572,6 +573,17 @@
-     m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
-     apiForm->addRow(i18n("API key"), m_apiKey);
- 
+@@ -565,4 +566,15 @@
+     m_attachVisionFrames->setChecked(false);
+     m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next API turn. Leave this off for text-only models."));
+     apiForm->addRow(QString(), m_attachVisionFrames);
++
 +    auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
 +    requestTimeoutSeconds->setObjectName(QStringLiteral("agentRequestTimeoutSeconds"));
 +    requestTimeoutSeconds->setRange(15, 3600);
@@ -23,9 +24,7 @@
 +        QSettings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent")).setValue(QStringLiteral("requestTimeoutSeconds"), seconds);
 +    });
 +
-     m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
-     m_fullAccess->setChecked(true);
-     m_fullAccess->setToolTip(i18n("When enabled, the API model can use native editing tools and trigger any action exposed by Update P5 Edit Aja. Use Undo/versioned project files for reversible work."));
+     toolBox->addItem(apiGroup, i18n("API"));
 @@ -1585,6 +1597,7 @@
      QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
      settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
