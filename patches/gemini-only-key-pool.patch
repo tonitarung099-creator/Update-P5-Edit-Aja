@@ -240,16 +240,6 @@ index a4e6448..14fed4e 100644
  #include <QPointer>
 +#include <QPlainTextEdit>
  #include <QRegularExpression>
-@@ -306,7 +307,7 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
-     auto *description = new QLabel(
--        i18n("One open tool layer for every agent. Connect an OpenAI-compatible API inside the editor, or let external agents control Update P5 Edit Aja through MCP."), this);
-+        i18n("Built-in AI Agent uses Google Gemini only. Add up to 100 Gemini API keys in the API section; editor tools remain available through the same native tool layer."), this);
-     description->setWordWrap(true);
-     layout->addWidget(description);
- 
--    auto *agentGroup = new QGroupBox(i18n("AI Agent — Main Control"), this);
-+    auto *agentGroup = new QGroupBox(this);
-     agentGroup->setObjectName(QStringLiteral("aiAgentMainControl"));
 @@ -583,4 +584,7 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
  
 -    auto *apiGroup = new QGroupBox(i18n("API agent"), this);
