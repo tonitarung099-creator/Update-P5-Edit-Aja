@@ -65,6 +65,11 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"setMaximumBlockCount\(600\)", "Bounded AI trace block count"),
     ("src/aiassistant/aiassistantwidget.cpp", r"boundedDisplayHtml\(text, 12000\)", "Bounded AI trace entry display"),
     ("src/aiassistant/aiassistantwidget.cpp", r"setMaximumBlockCount\(120\)", "Bounded Local Edit history block count"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"generativelanguage\.googleapis\.com/v1beta/openai/chat/completions", "Gemini-only API endpoint"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"geminiApiKeyPool", "Gemini API key pool editor"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"keys\.size\(\) >= 100", "Gemini API key pool cap"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"httpStatus == 429", "Gemini rate-limit rotation trigger"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"Retry-After", "Gemini key cooldown header"),
 ]
 
 
