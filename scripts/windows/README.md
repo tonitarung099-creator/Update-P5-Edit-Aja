@@ -3,14 +3,29 @@
 The Windows workflow is intentionally thin. Each failure domain lives in one
 script so fixes can be isolated and reviewed without editing a large YAML file.
 
+## Current Windows delivery policy — portable ZIP only
+
+Edit Aja no longer builds or tests an installer. Windows delivery is a single
+`Update-P5-Edit-Aja-Portable-Windows-x64.zip`: extract it and run
+`bin\kdenlive.exe`. The Craft blueprint deliberately calls the pinned
+`PortablePackager` directly and stops before the inherited NSIS layer.
+`CraftSettings.ini` selects ZIP as the portable archive type.
+
+Startup and functional smoke tests extract that ZIP into a temporary directory
+and run the application directly from the extracted files. They do not write
+installer registry keys, create Start-menu shortcuts, or run an uninstaller.
+
+The Build #61–#68 NSIS notes later in this file are retained only as historical
+debugging context. They are not requirements for the current pipeline.
+
 | Script | Responsibility |
 | --- | --- |
 | `reconstruct-source.ps1` | Clone pinned Kdenlive source, apply the patch chain, brand it, verify required P5 features, and archive corresponding source. |
 | `bootstrap-craft.ps1` | Download the pinned Craft bootstrap, select MinGW, bootstrap Craft, and apply stable Craft settings. |
 | `patch-gettext.ps1` | Apply the MinGW/libxml2 compatibility hotfix to Craft's gettext blueprint. |
 | `install-blueprint.ps1` | Copy the prepared Edit Aja Craft blueprint into Craft's KDE blueprint tree. |
-| `invoke-craft.ps1` | Run one explicit Craft phase: dependencies, application build, packager install, or package creation. |
-| `collect-package.ps1` | Find the produced Windows package and copy runnable artifacts into `artifacts/windows`. |
+| `invoke-craft.ps1` | Run one explicit Craft phase: dependencies, application build, or portable package creation. |
+| `collect-package.ps1` | Find the Craft portable ZIP, rename it to the canonical portable artifact name, and write its SHA-256. |
 | `craft-env.ps1` | Shared helper that imports Craft's environment safely. |
 
 Pinned external revisions and patch hashes are stored in
@@ -44,7 +59,7 @@ use the same dependency set.
 Regression tests exercise the dependency traversal and failure paths. The
 Windows quality gate also creates a real junction and checks file access,
 existing-destination failure, and preservation of the source after removal.
-This gate does not replace testing the final installer and application.
+This gate does not replace testing the final portable ZIP and application.
 
 ## Craft configuration discovery
 
