@@ -125,3 +125,10 @@ Original baseline repository: https://github.com/tonitarung099-creator/Edit-Aja
 This repository: https://github.com/tonitarung099-creator/Update-P5-Edit-Aja
 
 Third-party engines/models added in later phases must receive a separate license/dependency review before they are bundled or distributed.
+
+## UI stability and AI continuation
+
+See [UI stability audit and handoff](docs/ai/UI_STABILITY_HANDOFF.md) for the
+verified build baseline, prioritized findings, Windows UI test matrix, and the
+next implementation tasks. This plan distinguishes source/component checks from
+actual packaged UI verification.
