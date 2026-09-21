@@ -150,6 +150,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "creator-layout-filmora",
+      "path": "patches/creator-layout-filmora.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -192,6 +199,10 @@
     {
       "source": "patches/ai-agent-toolbox.patch",
       "destination": "craft/editaja/ai-agent-toolbox.patch"
+    },
+    {
+      "source": "patches/creator-layout-filmora.patch",
+      "destination": "craft/editaja/creator-layout-filmora.patch"
     }
   ]
 }
