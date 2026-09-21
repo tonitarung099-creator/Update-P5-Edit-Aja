@@ -54,6 +54,10 @@ around this shared implementation.
 
 ## Windows build chain
 
+Windows delivery is portable-only. The workflow does not install NSIS, does not
+create an installer, and does not run install/uninstall tests. The distributable
+artifact is a ZIP that can be extracted and launched directly.
+
 After the quality-gated commit is checked out:
 
 1. `scripts/prepare_build_inputs.py` prepares the Craft payload.
@@ -66,9 +70,10 @@ After the quality-gated commit is checked out:
 5. `scripts/windows/install-blueprint.ps1` installs the Edit Aja blueprint.
 6. `scripts/windows/invoke-craft.ps1 -Mode install-deps` installs dependencies.
 7. `scripts/windows/invoke-craft.ps1 -Mode build` compiles the application.
-8. The same script installs the packager and creates the package.
-9. `scripts/windows/collect-package.ps1` collects the runnable artifact.
-10. GitHub uploads the Windows package and verified corresponding source.
+8. `scripts/windows/prepare-package-images.ps1` verifies the complete portable runtime image set.
+9. `scripts/windows/invoke-craft.ps1 -Mode package` runs Craft's PortablePackager and creates a ZIP without NSIS.
+10. `scripts/windows/collect-package.ps1` collects and canonicalizes `Update-P5-Edit-Aja-Portable-Windows-x64.zip` plus its SHA-256.
+11. GitHub uploads the portable ZIP and verified corresponding source, then startup/functional smoke tests extract and run the ZIP directly.
 
 ## Debugging boundaries
 
@@ -83,8 +88,8 @@ Use the failed gate/step as the owner of the problem:
 - **gettext** -> MinGW/libxml2 compatibility patch;
 - **Install dependencies** -> Craft dependency resolution/cache;
 - **Build** -> compiler/CMake/linker;
-- **Package** -> packager;
-- **Collect package** -> artifact discovery.
+- **Package** -> portable runtime collection/archive generation;
+- **Collect package** -> portable ZIP artifact discovery.
 
 Avoid adding temporary repair logic directly to
 `.github/workflows/build-windows.yml`. Put fixes in the owning script and add a
