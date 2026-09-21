@@ -1,24 +1,14 @@
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -19,6 +19,7 @@
- #include <QDateTime>
- #include <QFile>
+@@ -21,2 +21,3 @@
  #include <QFileDialog>
 +#include <QCryptographicHash>
  #include <QFileInfo>
- #include <QFont>
- #include <QFormLayout>
-@@ -45,6 +46,7 @@
- #include <QStandardPaths>
- #include <QSettings>
+@@ -47,2 +48,3 @@
  #include <QTextBrowser>
 +#include <QVariantMap>
  #include <QTextDocument>
- #include <QTimer>
- #include <QToolBox>
-@@ -581,20 +583,44 @@
-             });
-     refreshFilmContextStatus();
+@@ -583,16 +585,40 @@
  
 -    auto *apiGroup = new QGroupBox(i18n("API agent"), this);
 +    auto *apiGroup = new QGroupBox(i18n("Gemini API"), this);
@@ -68,36 +58,22 @@
 +    connect(m_apiKey, &QLineEdit::textChanged, this, refreshGeminiKeyStatus);
 +    refreshGeminiKeyStatus();
  
-     m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
-     m_fullAccess->setChecked(true);
-@@ -613,7 +639,7 @@
- 
-     m_attachVisionFrames = new QCheckBox(i18n("Attach exported frames to vision-capable API models"), apiGroup);
+@@ -615,3 +641,3 @@
      m_attachVisionFrames->setChecked(false);
 -    m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next API turn. Leave this off for text-only models."));
 +    m_attachVisionFrames->setToolTip(i18n("When enabled, frames exported by the agent are embedded into the next Gemini turn."));
      apiForm->addRow(QString(), m_attachVisionFrames);
- 
-     auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
-@@ -621,13 +647,13 @@
-     requestTimeoutSeconds->setRange(15, 3600);
-     requestTimeoutSeconds->setValue(qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600));
+@@ -623,3 +649,3 @@
      requestTimeoutSeconds->setSuffix(i18n(" s"));
 -    requestTimeoutSeconds->setToolTip(i18n("Maximum wait for each API model response. Increase this for slower local models. Tool jobs have their own cancellation and deadline rules."));
 +    requestTimeoutSeconds->setToolTip(i18n("Maximum wait for each Gemini model response. Tool jobs have their own cancellation and deadline rules."));
      apiForm->addRow(i18n("Request timeout"), requestTimeoutSeconds);
-     connect(requestTimeoutSeconds, qOverload<int>(&QSpinBox::valueChanged), this, [](int seconds) {
-         QSettings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent")).setValue(QStringLiteral("requestTimeoutSeconds"), seconds);
-     });
+@@ -629,3 +655,3 @@
  
 -    toolBox->addItem(apiGroup, i18n("API"));
 +    toolBox->addItem(apiGroup, i18n("Gemini"));
  
-     auto *mcpGroup = new QGroupBox(i18n("MCP"), this);
-     auto *mcpLayout = new QVBoxLayout(mcpGroup);
-@@ -1618,9 +1644,32 @@
-         return;
-     }
+@@ -1620,5 +1646,28 @@
  
 +    const QString model = m_model->text().trimmed();
 +    if (!model.startsWith(QStringLiteral("gemini-"), Qt::CaseInsensitive)) {
@@ -128,11 +104,7 @@
 +    settings.remove(QStringLiteral("apiUrl"));
 +    settings.setValue(QStringLiteral("model"), model);
      const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
- 
-     m_output->clear();
-@@ -1632,7 +1681,17 @@
-                         .arg(i18n("Checkpoint:"), QString::fromUtf8(QJsonDocument(checkpoint).toJson(QJsonDocument::Compact)).toHtmlEscaped()));
-     }
+@@ -1634,3 +1683,13 @@
  
 -    m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
 +    const QString serializedKeys = apiKeys.join(QLatin1Char('\n'));
@@ -147,20 +119,13 @@
 +        m_agent->setProperty("p5GeminiCooldowns", QVariantMap{});
 +    }
      m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000);
-     const int maxRounds = m_autonomousMode->isChecked() ? 96 : 32;
-     m_agent->run(prompt, m_fullAccess->isChecked(), maxRounds, m_attachVisionFrames->isChecked());
 --- a/src/aiassistant/openaicompatibleagent.cpp
 +++ b/src/aiassistant/openaicompatibleagent.cpp
-@@ -7,16 +7,101 @@
- #include "openaicompatibleagent.h"
- #include "agenttoolregistry.h"
+@@ -9,2 +9,3 @@
  
 +#include <QDateTime>
  #include <QJsonDocument>
- #include <QFile>
- #include <QFileInfo>
- #include <QJsonObject>
- #include <QNetworkAccessManager>
+@@ -15,6 +16,90 @@
  #include <QNetworkReply>
 +#include <QSet>
 +#include <QRegularExpression>
@@ -251,19 +216,11 @@
 +}
 +
  OpenAiCompatibleAgent::OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent)
-     : QObject(parent)
-     , m_registry(registry)
-@@ -40,6 +125,7 @@
- 
- void OpenAiCompatibleAgent::configure(const QString &chatCompletionsUrl, const QString &model, const QString &apiKey)
+@@ -42,2 +127,3 @@
  {
 +    setProperty("p5GeminiOnly", false);
      m_url = chatCompletionsUrl.trimmed();
-     m_model = model.trimmed();
-     m_apiKey = apiKey;
-@@ -61,6 +147,14 @@
-         fail(QStringLiteral("Configure the API URL and model first."));
-         return;
+@@ -63,2 +149,10 @@
      }
 +    if (property("p5GeminiOnly").toBool()) {
 +        const QStringList keys = geminiKeyPool(m_apiKey);
@@ -274,22 +231,14 @@
 +        }
 +    }
  
-     clearPendingToolState();
-     m_fullToolAccess = fullToolAccess;
-@@ -106,7 +200,9 @@
- 
- void OpenAiCompatibleAgent::sendTurn()
+@@ -108,3 +202,5 @@
  {
 -    if (++m_round > m_maxRounds) {
 +    const bool retrySameRound = property("p5GeminiRetrySameRound").toBool();
 +    setProperty("p5GeminiRetrySameRound", false);
 +    if (!retrySameRound && ++m_round > m_maxRounds) {
          fail(QStringLiteral("Agent stopped after %1 tool rounds to avoid an accidental loop.").arg(m_maxRounds));
-         return;
-     }
-@@ -121,11 +217,26 @@
- 
-     QNetworkRequest request{QUrl(m_url)};
+@@ -123,4 +219,18 @@
      request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 -    if (!m_apiKey.isEmpty()) {
 -        request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + m_apiKey.toUtf8());
@@ -310,15 +259,11 @@
 +    if (!requestApiKey.isEmpty()) {
 +        request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + requestApiKey.toUtf8());
      }
- 
+@@ -128,2 +238,3 @@
      QNetworkReply *reply = m_network->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
 +    reply->setProperty("p5GeminiKeyIndex", geminiKeyIndex);
      m_reply = reply;
-     m_requestTimer->start(m_requestTimeoutMs);
-     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-@@ -144,6 +255,50 @@
- {
-     const QByteArray bytes = reply->readAll();
+@@ -146,2 +257,46 @@
      if (reply->error() != QNetworkReply::NoError) {
 +        if (property("p5GeminiOnly").toBool()) {
 +            const QStringList keys = geminiKeyPool(m_apiKey);
@@ -365,5 +310,3 @@
 +            }
 +        }
          fail(QStringLiteral("API error: %1\n%2").arg(reply->errorString(), QString::fromUtf8(bytes.left(4000))));
-         return;
-     }
