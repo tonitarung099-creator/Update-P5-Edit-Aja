@@ -7,6 +7,9 @@ from pathlib import Path
 
 
 TEXT_CHECKS = [
+    ("src/aiassistant/aiassistantwidget.cpp", r"void AiAssistantWidget::runAgent\(\)\s*\{(?:\s*//[^\n]*\n)*\s*if \(!m_runButton->isEnabled\(\)\)", "Agent duplicate UI activation guard"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"m_prompt->setEnabled\(!busy\)", "Agent prompt follows busy state"),
+    ("src/aiassistant/openaicompatibleagent.cpp", r"if \(m_reply != reply\)", "Ignore detached agent reply completion"),
     ("src/main.cpp", r'i18n\("Update P5 Edit Aja"\)', "Update P5 Edit Aja branding"),
     ("src/aiassistant/aiassistantwidget.cpp", r"AI Edit JSON", "Phase 6 AI Edit JSON UI"),
     ("src/aiassistant/aiassistantwidget.cpp", r"Local Edit.*Lightweight", "Phase 12 Local Edit UI"),

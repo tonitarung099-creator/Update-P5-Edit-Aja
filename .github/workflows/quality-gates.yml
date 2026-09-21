@@ -293,3 +293,14 @@ jobs:
 
       - name: Reconstruct and verify pinned P5 source
         run: python scripts/reconstruct_source.py --output corresponding-source
+
+      - name: Install Qt for agent lifecycle component test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qt6-base-dev
+
+      - name: Compile and test reconstructed Qt agent lifecycle
+        run: |
+          cmake -S tests/qt-agent -B build/qt-agent -DP5_SOURCE_DIR="$PWD/corresponding-source"
+          cmake --build build/qt-agent --parallel 2
+          ctest --test-dir build/qt-agent --output-on-failure

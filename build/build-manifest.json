@@ -164,6 +164,12 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "ai-agent-request-lifecycle",
+      "path": "patches/ai-agent-request-lifecycle.patch",
+      "strip": 1,
+      "check": true
     }
   ],
   "blueprint_payloads": [
@@ -214,6 +220,10 @@
     {
       "source": "patches/creator-layout-reset.patch",
       "destination": "craft/editaja/creator-layout-reset.patch"
+    },
+    {
+      "source": "patches/ai-agent-request-lifecycle.patch",
+      "destination": "craft/editaja/ai-agent-request-lifecycle.patch"
     }
   ]
 }

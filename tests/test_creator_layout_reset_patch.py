@@ -38,8 +38,10 @@ class CreatorLayoutResetPatchTests(unittest.TestCase):
         self.assertNotIn("configureEditorAccess", self.patch)
         self.assertNotIn("saveFileAs(", self.patch)
 
-    def test_layout_reset_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
+    def test_layout_reset_follows_layout_migration_and_is_copied_to_craft(self):
+        names = [item["name"] for item in self.manifest["apply_chain"]]
+        self.assertLess(names.index("creator-layout-filmora"), names.index("creator-layout-reset"))
+        entry = self.manifest["apply_chain"][names.index("creator-layout-reset")]
         self.assertEqual(entry["name"], "creator-layout-reset")
         self.assertEqual(entry["path"], "patches/creator-layout-reset.patch")
         self.assertTrue(entry["check"])
@@ -55,7 +57,7 @@ class CreatorLayoutResetPatchTests(unittest.TestCase):
         )
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("creator-layout-reset.patch", 1)]'))
+        self.assertLess(chain.index('("creator-layout-filmora.patch", 1)'), chain.index('("creator-layout-reset.patch", 1)'))
 
 
 if __name__ == "__main__":

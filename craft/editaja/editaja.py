@@ -17,7 +17,7 @@ class subinfo(info.infoclass):
         # url|branch|revision: an empty branch plus the full SHA pins the exact
         # upstream source used when Phase 5 was created.
         self.svnTargets["editaja"] = f"https://github.com/KDE/kdenlive.git||{UPSTREAM_COMMIT}"
-        self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1), ("phase12.patch", 1), ("phase13.patch", 1), ("phase14.patch", 1), ("phase15.patch", 1), ("subtitle-initialization.patch", 1), ("keyframe-api-compile-fix.patch", 1), ("save-project-agent.patch", 1), ("ai-agent-sidebar.patch", 1), ("creator-workspace-filmora.patch", 1), ("ai-agent-toolbox.patch", 1), ("creator-layout-filmora.patch", 1), ("creator-layout-reset.patch", 1)]
+        self.patchToApply["editaja"] = [("phase5.patch", 2), ("build-fixes.patch", 1), ("phase6.patch", 1), ("phase12.patch", 1), ("phase13.patch", 1), ("phase14.patch", 1), ("phase15.patch", 1), ("subtitle-initialization.patch", 1), ("keyframe-api-compile-fix.patch", 1), ("save-project-agent.patch", 1), ("ai-agent-sidebar.patch", 1), ("creator-workspace-filmora.patch", 1), ("ai-agent-toolbox.patch", 1), ("creator-layout-filmora.patch", 1), ("creator-layout-reset.patch", 1), ("ai-agent-request-lifecycle.patch", 1)]
         self.defaultTarget = "editaja"
         self.description = "Expanded AI-assisted video editor based on Edit Aja and Kdenlive"
         self.webpage = "https://github.com/tonitarung099-creator/Update-P5-Edit-Aja"
