@@ -42,8 +42,10 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
         self.assertNotIn("toolCatalog", self.patch)
         self.assertNotIn("invokeOrStart", self.patch)
 
-    def test_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
+    def test_patch_precedes_gemini_pool_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        bounded_index = names.index("bounded-ai-output")
+        entry = self.manifest["apply_chain"][bounded_index]
         self.assertEqual(entry["name"], "bounded-ai-output")
         self.assertEqual(entry["path"], "patches/bounded-ai-output.patch")
         self.assertTrue(entry["check"])
