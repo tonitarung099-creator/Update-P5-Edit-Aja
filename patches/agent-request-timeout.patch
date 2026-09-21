@@ -1,6 +1,6 @@
 --- a/src/aiassistant/openaicompatibleagent.h
 +++ b/src/aiassistant/openaicompatibleagent.h
-@@ -16,6 +16,7 @@
+@@ -14,6 +14,7 @@
  
  class AgentToolRegistry;
  class QNetworkAccessManager;
@@ -9,13 +9,14 @@
  /**
   * @brief Minimal OpenAI-compatible function-calling client.
 @@ -29,6 +30,7 @@
+     explicit OpenAiCompatibleAgent(AgentToolRegistry *registry, QObject *parent = nullptr);
  
      void configure(const QString &chatCompletionsUrl, const QString &model, const QString &apiKey);
 +    void setRequestTimeoutMs(int timeoutMs);
      void run(const QString &prompt, bool fullToolAccess = true, int maxRounds = 32, bool attachToolImages = false);
      void cancel();
  
-@@ -45,10 +47,13 @@
+@@ -44,10 +46,12 @@
      void processNextToolCall();
      void appendToolResult(const QJsonObject &call, const QJsonObject &result);
      void clearPendingToolState();
@@ -28,7 +29,7 @@
      QPointer<QNetworkReply> m_reply;
      QString m_toolJobId;
      QJsonArray m_pendingToolCalls;
-@@ -62,4 +67,5 @@
+@@ -60,4 +64,5 @@
      bool m_attachToolImages{false};
      int m_round{0};
      int m_maxRounds{32};
@@ -36,7 +37,8 @@
  };
 --- a/src/aiassistant/openaicompatibleagent.cpp
 +++ b/src/aiassistant/openaicompatibleagent.cpp
-@@ -14,12 +14,16 @@
+@@ -14,13 +14,17 @@
+ #include <QNetworkAccessManager>
  #include <QNetworkReply>
  #include <QNetworkRequest>
 +#include <QTimer>
@@ -53,7 +55,7 @@
      if (m_registry) {
          connect(m_registry, &AgentToolRegistry::jobFinished, this, [this](const QString &jobId, const QJsonObject &result) {
              if (jobId != m_toolJobId || m_pendingToolIndex < 0 || m_pendingToolIndex >= m_pendingToolCalls.size()) {
-@@ -35,6 +39,11 @@
+@@ -41,6 +45,11 @@
      m_apiKey = apiKey;
  }
  
@@ -65,7 +67,7 @@
  void OpenAiCompatibleAgent::run(const QString &prompt, bool fullToolAccess, int maxRounds, bool attachToolImages)
  {
      if (m_reply || !m_toolJobId.isEmpty()) {
-@@ -79,6 +88,7 @@
+@@ -88,6 +97,7 @@
      // cannot report a cancellation as an API error or alter a later run.
      QNetworkReply *reply = m_reply.data();
      m_reply.clear();
@@ -73,7 +75,7 @@
      if (reply) {
          reply->abort();
      }
-@@ -111,11 +121,13 @@
+@@ -117,11 +127,13 @@
  
      QNetworkReply *reply = m_network->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
      m_reply = reply;
@@ -87,7 +89,7 @@
          m_reply.clear();
          handleReply(reply);
          reply->deleteLater();
-@@ -272,8 +284,25 @@
+@@ -283,8 +295,25 @@
      m_pendingToolIndex = 0;
  }
  
@@ -113,17 +115,17 @@
      clearPendingToolState();
      Q_EMIT busyChanged(false);
      Q_EMIT failed(message);
- }
 --- a/src/aiassistant/aiassistantwidget.h
 +++ b/src/aiassistant/aiassistantwidget.h
-@@ -23,6 +23,7 @@
+@@ -21,6 +21,7 @@
+ class QLabel;
  class QLineEdit;
  class QPushButton;
 +class QSpinBox;
  class QTextBrowser;
  class QProcess;
  
-@@ -93,6 +94,7 @@
+@@ -92,6 +93,7 @@
      QLineEdit *m_apiUrl{nullptr};
      QLineEdit *m_model{nullptr};
      QLineEdit *m_apiKey{nullptr};
@@ -133,13 +135,15 @@
      QCheckBox *m_autoCheckpoint{nullptr};
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -39,6 +39,7 @@
+@@ -41,6 +41,7 @@
+ #include <QScrollArea>
+ #include <QSizePolicy>
  #include <QSet>
 +#include <QSpinBox>
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -580,6 +581,14 @@
+@@ -572,6 +573,13 @@
      m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
      apiForm->addRow(i18n("API key"), m_apiKey);
  
@@ -153,7 +157,7 @@
      m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
      m_fullAccess->setChecked(true);
      m_fullAccess->setToolTip(i18n("When enabled, the API model can use native editing tools and trigger any action exposed by Update P5 Edit Aja. Use Undo/versioned project files for reversible work."));
-@@ -1580,6 +1589,7 @@
+@@ -1576,6 +1584,7 @@
      QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
      settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
      settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
@@ -161,7 +165,7 @@
  
      m_output->clear();
      appendTrace(QStringLiteral("<b>%1</b> %2").arg(i18n("You:"), prompt.toHtmlEscaped()));
-@@ -1593,6 +1603,7 @@
+@@ -1587,6 +1596,7 @@
      }
  
      m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
