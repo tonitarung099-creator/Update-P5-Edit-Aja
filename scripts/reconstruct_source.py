@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -30,6 +31,20 @@ def load_manifest(root: Path, manifest_path: Path) -> dict:
 def apply_patch(root: Path, source_root: Path, entry: dict) -> None:
     patch_path = (root / entry["path"]).resolve()
     strip = int(entry["strip"])
+
+    if entry.get("name") == "gemini-api-pool":
+        for relative in (
+            "src/aiassistant/aiassistantwidget.cpp",
+            "src/aiassistant/openaicompatibleagent.cpp",
+        ):
+            target = source_root / relative
+            raw = target.read_bytes()
+            print(f"Gemini patch preflight source SHA256 {relative}: {hashlib.sha256(raw).hexdigest()}")
+            if relative.endswith("aiassistantwidget.cpp"):
+                lines = raw.decode("utf-8", errors="replace").splitlines()
+                print("Gemini patch preflight widget context:")
+                for line_number in range(575, min(635, len(lines)) + 1):
+                    print(f"{line_number}: {lines[line_number - 1]!r}")
 
     if entry.get("check"):
         run(
