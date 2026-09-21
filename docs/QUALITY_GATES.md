@@ -18,6 +18,14 @@ expensive check, not the first debugging tool.
 8. **Release smoke test** — verify the packaged application starts and key
    product flows work.
 
+### Windows artifact policy
+
+The Windows artifact is **portable ZIP only**. Packaging must produce
+`Update-P5-Edit-Aja-Portable-Windows-x64.zip`; smoke tests extract that ZIP
+and run `bin\kdenlive.exe` directly. Installer generation, registry
+installation, Start-menu integration, and uninstall verification are not part
+of the current product or quality gates.
+
 ## Component boundaries
 
 | Gate | Typical ownership |
