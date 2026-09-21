@@ -192,10 +192,8 @@ public static class P5SmokeUiNative
 
     public static IntPtr FindBestTopLevelWindow(int processId)
     {
-        IntPtr bestTitled = IntPtr.Zero;
-        long bestTitledArea = 0;
-        IntPtr bestAny = IntPtr.Zero;
-        long bestAnyArea = 0;
+        IntPtr bestEditor = IntPtr.Zero;
+        long bestEditorArea = 0;
 
         EnumWindows((hWnd, lParam) =>
         {
@@ -205,6 +203,15 @@ public static class P5SmokeUiNative
             GetWindowThreadProcessId(hWnd, out ownerProcessId);
             if (ownerProcessId != (uint)processId) return true;
 
+            int titleLength = GetWindowTextLength(hWnd);
+            if (titleLength <= 0) return true;
+
+            var text = new System.Text.StringBuilder(titleLength + 1);
+            GetWindowText(hWnd, text, text.Capacity);
+            string title = text.ToString();
+            if (title.IndexOf("Splash Screen", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (title.IndexOf("Update P5 Edit Aja", StringComparison.OrdinalIgnoreCase) < 0) return true;
+
             RECT rect;
             if (!GetWindowRect(hWnd, out rect)) return true;
             int width = rect.Right - rect.Left;
@@ -212,21 +219,15 @@ public static class P5SmokeUiNative
             if (width < 200 || height < 120) return true;
 
             long area = (long)width * height;
-            if (area > bestAnyArea)
+            if (area > bestEditorArea)
             {
-                bestAny = hWnd;
-                bestAnyArea = area;
-            }
-
-            if (GetWindowTextLength(hWnd) > 0 && area > bestTitledArea)
-            {
-                bestTitled = hWnd;
-                bestTitledArea = area;
+                bestEditor = hWnd;
+                bestEditorArea = area;
             }
             return true;
         }, IntPtr.Zero);
 
-        return bestTitled != IntPtr.Zero ? bestTitled : bestAny;
+        return bestEditor;
     }
 
     public static string GetWindowTitle(IntPtr hWnd)
@@ -261,7 +262,7 @@ function Wait-SmokeMainWindow {
         Start-Sleep -Milliseconds 250
     }
 
-    throw "Packaged application did not expose a visible top-level main window within $TimeoutSeconds seconds."
+    throw "Packaged application did not expose a visible non-splash Edit Aja main window within $TimeoutSeconds seconds."
 }
 
 function Get-SmokeWindowBounds {
@@ -420,7 +421,7 @@ function Save-SmokeWindowScreenshot {
         dpi = [int]$dpi
         scale_percent = [Math]::Round(($dpi / 96.0) * 100)
         title = [P5SmokeUiNative]::GetWindowTitle($handle)
-        selection = 'largest_visible_titled_top_level_window'
+        selection = 'largest_visible_non_splash_edit_aja_window'
         capture_method = $captureMethod
     }
 }
