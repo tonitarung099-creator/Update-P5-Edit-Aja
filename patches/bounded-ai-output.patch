@@ -1,0 +1,76 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -44,6 +44,7 @@
+ #include <QStandardPaths>
+ #include <QSettings>
+ #include <QTextBrowser>
++#include <QTextDocument>
+ #include <QTimer>
+ #include <QToolBox>
+ #include <QStringList>
+@@ -51,6 +52,26 @@
+ #include <QVector>
+ 
+ namespace {
++QString boundedPlainDisplayText(const QString &text, int maxCharacters)
++{
++    const QString simplified = text.trimmed();
++    if (simplified.size() <= maxCharacters) {
++        return simplified;
++    }
++    return simplified.left(maxCharacters) + QStringLiteral("… [display truncated]");
++}
++
++QString boundedDisplayHtml(const QString &html, int maxCharacters)
++{
++    if (html.size() <= maxCharacters) {
++        return html;
++    }
++    QTextDocument document;
++    document.setHtml(html);
++    const QString plain = boundedPlainDisplayText(document.toPlainText(), maxCharacters);
++    return plain.toHtmlEscaped() + QStringLiteral("<br><i>[display truncated; full tool data is preserved for the agent]</i>");
++}
++
+ void stopOwnedProcessTree(QProcess *process)
+ {
+     if (!process || process->state() == QProcess::NotRunning) {
+@@ -307,6 +328,7 @@
+     agentLayout->addWidget(m_cancelButton, 2, 1);
+ 
+     m_output = new QTextBrowser(agentGroup);
++    m_output->document()->setMaximumBlockCount(600);
+     m_output->setOpenExternalLinks(false);
+     m_output->setMinimumHeight(220);
+     m_output->setPlaceholderText(i18n("Agent tool calls and results will appear here."));
+@@ -378,6 +400,7 @@
+     historyLabel->setFont(historyFont);
+     m_localEditClearHistoryButton = new QPushButton(i18n("Clear"), localEditGroup);
+     m_localEditHistory = new QTextBrowser(localEditGroup);
++    m_localEditHistory->document()->setMaximumBlockCount(120);
+     m_localEditHistory->setObjectName(QStringLiteral("localEditHistory"));
+     m_localEditHistory->setMaximumHeight(135);
+     m_localEditHistory->setPlaceholderText(i18n("Applied Local Edit jobs will appear here."));
+@@ -703,8 +726,8 @@
+     const QString route = result.value(QStringLiteral("route")).toString(QStringLiteral("local")).toUpper().toHtmlEscaped();
+     const bool applied = result.value(QStringLiteral("applied")).toBool();
+     const QString state = applied ? QStringLiteral("✓") : QStringLiteral("•");
+-    const QString safeCommand = command.trimmed().toHtmlEscaped();
+-    const QString safeMessage = result.value(QStringLiteral("message")).toString().toHtmlEscaped();
++    const QString safeCommand = boundedPlainDisplayText(command, 800).toHtmlEscaped();
++    const QString safeMessage = boundedPlainDisplayText(result.value(QStringLiteral("message")).toString(), 2400).toHtmlEscaped();
+     m_localEditHistory->append(QStringLiteral("<b>%1 %2 · %3</b> — %4<br><span style='opacity:0.8'>%5</span>")
+                                    .arg(state)
+                                    .arg(when.toHtmlEscaped())
+@@ -2517,7 +2540,9 @@
+ 
+ void AiAssistantWidget::appendTrace(const QString &text)
+ {
+-    m_output->append(QStringLiteral("<p>%1</p>").arg(text));
++    // Limit display cost only. The original tool/model payload remains untouched in
++    // the agent message flow; this function is only the sidebar trace surface.
++    m_output->append(QStringLiteral("<p>%1</p>").arg(boundedDisplayHtml(text, 12000)));
+ }
+ 
+ void AiAssistantWidget::setBusy(bool busy)
+ {
