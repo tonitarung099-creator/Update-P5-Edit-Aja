@@ -1,6 +1,6 @@
 --- a/src/aiassistant/aiassistantwidget.h
 +++ b/src/aiassistant/aiassistantwidget.h
-@@ -23,6 +23,7 @@
+@@ -23,5 +23,6 @@
  class QLineEdit;
  class QPushButton;
 +class QSpinBox;
@@ -25,7 +25,7 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -580,6 +581,14 @@
+@@ -580,6 +581,13 @@
      m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
      apiForm->addRow(i18n("API key"), m_apiKey);
  
