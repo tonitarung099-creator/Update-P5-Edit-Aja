@@ -27,6 +27,15 @@ class GeminiKeyPoolPatchTests(unittest.TestCase):
         self.assertIn("gemini-2.5-flash", additions)
         self.assertNotIn('apiForm->addRow(i18n("Chat API URL")', additions)
 
+    def test_primary_agent_copy_is_gemini_only(self):
+        additions = "\n".join(
+            line[1:] for line in self.patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        self.assertIn("Built-in AI Agent uses Google Gemini only", additions)
+        self.assertIn("up to 100 Gemini API keys", additions)
+        self.assertNotIn("Connect an OpenAI-compatible API inside the editor", additions)
+
     def test_pool_is_bounded_and_rotates_on_quota(self):
         for marker in (
             "keys.size() >= 100",
