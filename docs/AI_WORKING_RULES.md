@@ -155,7 +155,7 @@ Track these stages separately:
 | SOURCE RECONSTRUCTION | Pinned upstream + patch chain reconstructed |
 | DEPENDENCY INSTALL | Required build dependencies installed |
 | WINDOWS COMPILE | Application compiled on Windows |
-| PACKAGING | Installer/package generation succeeded |
+| PACKAGING | Portable ZIP generation succeeded |
 | ARTIFACT CREATION | Correct artifact was collected/uploaded |
 | PACKAGED-APP SMOKE TEST | Built application actually starts and basic flows work |
 | RELEASE VERIFICATION | Release criteria verified end-to-end |
