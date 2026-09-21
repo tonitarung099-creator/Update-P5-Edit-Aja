@@ -87,7 +87,7 @@ class WindowsBuildSchedulingTests(unittest.TestCase):
         self.assertIn("Assert-SmokeProcessRunning", script)
         self.assertIn("PORTABLE STARTUP SMOKE PASS", script)
         self.assertIn("Expand-Archive", support)
-        self.assertIn("bin\\\\kdenlive.exe", support)
+        self.assertIn("bin\\kdenlive.exe", support)
         for forbidden in ("'/S', '/CurrentUser'", "Install_Dir"):
             self.assertNotIn(forbidden, script)
         self.assertNotIn("uninstall.exe", script)
