@@ -25,8 +25,7 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -580,6 +581,13 @@
-     m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
+@@ -579,3 +580,10 @@
      apiForm->addRow(i18n("API key"), m_apiKey);
  
 +    m_requestTimeoutSeconds = new QSpinBox(apiGroup);
@@ -37,21 +36,12 @@
 +    apiForm->addRow(i18n("Request timeout"), m_requestTimeoutSeconds);
 +
      m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
-     m_fullAccess->setChecked(true);
-     m_fullAccess->setToolTip(i18n("When enabled, the API model can use native editing tools and trigger any action exposed by Update P5 Edit Aja. Use Undo/versioned project files for reversible work."));
-@@ -1580,6 +1589,7 @@
-     QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
-     settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
+@@ -1582,3 +1590,4 @@
      settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
 +    settings.setValue(QStringLiteral("requestTimeoutSeconds"), m_requestTimeoutSeconds->value());
  
      m_output->clear();
-     appendTrace(QStringLiteral("<b>%1</b> %2").arg(i18n("You:"), prompt.toHtmlEscaped()));
-@@ -1593,6 +1603,7 @@
-     }
- 
+@@ -1595,2 +1604,3 @@
      m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
 +    m_agent->setRequestTimeoutMs(m_requestTimeoutSeconds->value() * 1000);
      const int maxRounds = m_autonomousMode->isChecked() ? 96 : 32;
-     m_agent->run(prompt, m_fullAccess->isChecked(), maxRounds, m_attachVisionFrames->isChecked());
- }
