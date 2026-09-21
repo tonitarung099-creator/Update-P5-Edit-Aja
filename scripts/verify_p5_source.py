@@ -52,13 +52,13 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"m_filmContextIndexer, &QProcess::errorOccurred", "Nonblocking Film Context indexer startup error path"),
     ("src/aiassistant/aiassistantwidget.h", r"NativeAsyncToolExecutor", "Async native editor executor contract"),
     ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool", "Async native tool registration bridge"),
-    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool\\(\\s*QStringLiteral\\(\\\"kdenlive_detect_silence\\\"\\)", "Silence detection registered asynchronously"),
-    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool\\(\\s*QStringLiteral\\(\\\"kdenlive_transcribe_media\\\"\\)", "Transcription registered asynchronously"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool\(\s*QStringLiteral\(\"kdenlive_detect_silence\"\)", "Silence detection registered asynchronously"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"registerAsyncNativeTool\(\s*QStringLiteral\(\"kdenlive_transcribe_media\"\)", "Transcription registered asynchronously"),
     ("src/mainwindow.cpp", r"stopAgentOwnedProcess", "Owned analysis process-tree cancellation"),
     ("src/mainwindow.cpp", r"FFmpeg silence detection timed out", "Async silence deadline handling"),
     ("src/mainwindow.cpp", r"Whisper transcription timed out", "Async transcription deadline handling"),
     ("tools/mcp/kdenlive_mcp_server.py", r"jobs/status", "MCP async job polling"),
-    ("tools/api/kdenlive_agent_api_example.py", r"/jobs/\\{job_id\\}", "REST example async job polling"),
+    ("tools/api/kdenlive_agent_api_example.py", r"/jobs/\{job_id\}", "REST example async job polling"),
 ]
 
 
