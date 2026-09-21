@@ -91,10 +91,10 @@ def prepare(craft_root: Path, package_name: str, *, dependencies_only: bool = Fa
         if desired.is_dir():
             continue
 
-        # Bootstrap installs runtime, SnoreToast and 7zip-base under MinSizeRel
-        # (Builds #51/#60/#61). Both binary tool recipes copy the same upstream
-        # archive for every release build type; never substitute another target.
-        # Do not extend this exception to source-built Qt or the application.
+        # Bootstrap may install the MinGW runtime and prebuilt SnoreToast under
+        # MinSizeRel even while Edit Aja is built as RelWithDebInfo. Reuse only
+        # the exact same target/version release image; never extend this
+        # exception to source-built Qt or the application.
         compatible_package = dependency.path == "libs/runtime" or (
             dependency.path == "dev-utils/snoretoast"
             and isinstance(instance, BinaryPackageBase)
