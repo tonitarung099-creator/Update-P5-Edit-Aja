@@ -7,6 +7,7 @@ import info
 from Blueprints.CraftPackageObject import CraftPackageObject
 from CraftCore import CraftCore
 from Packager.NullsoftInstallerPackager import NullsoftInstallerPackager
+from Packager.PortablePackager import PortablePackager
 
 
 UPSTREAM_COMMIT = "c3d8a38c04470f6726b21485fc488f2cd2921654"
@@ -122,13 +123,11 @@ class Package(CraftPackageObject.get("kde").pattern):
         ]
         self.defines["file_types"] = [".kdenlive"]
 
+        # On Windows Craft normally wraps PortablePackager with NSIS. Edit Aja is
+        # portable-only: build the same collected runtime image as a ZIP and stop
+        # before installer generation. This keeps Craft's dependency collection,
+        # blacklist and executable filters without writing registry/uninstall data.
         if isinstance(self, NullsoftInstallerPackager):
-            self.defines["registry_hook"] = (
-                'WriteRegStr SHCTX "Software\\Classes\\.kdenlive" "" "EditAja"\n'
-                'WriteRegStr SHCTX "Software\\Classes\\EditAja" "" "Update P5 Edit Aja project"\n'
-                'WriteRegStr SHCTX "Software\\Classes\\EditAja\\DefaultIcon" "" "$INSTDIR\\kdenlive.ico"\n'
-                'WriteRegStr SHCTX "Software\\Classes\\EditAja\\shell" "" "open"\n'
-                'WriteRegStr SHCTX "Software\\Classes\\EditAja\\shell\\open\\command" "" \'"$INSTDIR\\bin\\kdenlive.exe" "%1"\'\n'
-            )
+            return PortablePackager.createPackage(self)
 
         return super().createPackage()
