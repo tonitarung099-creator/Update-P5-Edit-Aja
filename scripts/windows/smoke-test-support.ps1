@@ -118,3 +118,205 @@ function Export-SmokeDiagnostics {
     @{ stage = $Stage; status = $Status; run_id = $env:GITHUB_RUN_ID; commit = $commit } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Directory 'result.json') -Encoding utf8
 }
+
+function Initialize-SmokeUiNative {
+    if (-not ('P5SmokeUiNative' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class P5SmokeUiNative
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd,
+        uint msg,
+        UIntPtr wParam,
+        IntPtr lParam,
+        uint flags,
+        uint timeout,
+        out UIntPtr result
+    );
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int command);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr hWnd);
+}
+'@
+    }
+    Add-Type -AssemblyName System.Drawing
+}
+
+function Wait-SmokeMainWindow {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [int]$TimeoutSeconds = 60
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        Assert-SmokeProcessRunning -Process $Process -Stage 'ui_evidence'
+        $Process.Refresh()
+        if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
+            try { [void]$Process.WaitForInputIdle(5000) } catch {}
+            $Process.Refresh()
+            if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
+                return $Process.MainWindowHandle
+            }
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
+    throw "Packaged application did not expose a main window within $TimeoutSeconds seconds."
+}
+
+function Save-SmokeWindowScreenshot {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    Initialize-SmokeUiNative
+    $handle = Wait-SmokeMainWindow -Process $Process
+    $rect = New-Object 'P5SmokeUiNative+RECT'
+    if (-not [P5SmokeUiNative]::GetWindowRect($handle, [ref]$rect)) {
+        throw "Could not read packaged application window bounds. Win32=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -lt 200 -or $height -lt 120) {
+        throw "Packaged application window bounds are implausible: $width x $height."
+    }
+
+    $directory = Split-Path -Parent $Path
+    if ($directory) { New-Item -ItemType Directory -Force $directory | Out-Null }
+
+    [void][P5SmokeUiNative]::ShowWindow($handle, 5)
+    [void][P5SmokeUiNative]::SetForegroundWindow($handle)
+    Start-Sleep -Milliseconds 500
+
+    $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $captureMethod = 'PrintWindow'
+    try {
+        $hdc = $graphics.GetHdc()
+        try {
+            $printed = [P5SmokeUiNative]::PrintWindow($handle, $hdc, 2)
+        }
+        finally {
+            $graphics.ReleaseHdc($hdc)
+        }
+
+        if (-not $printed) {
+            $captureMethod = 'CopyFromScreen'
+            $graphics.CopyFromScreen(
+                $rect.Left,
+                $rect.Top,
+                0,
+                0,
+                ([System.Drawing.Size]::new($width, $height))
+            )
+        }
+
+        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf) -or (Get-Item -LiteralPath $Path).Length -lt 1024) {
+        throw "UI screenshot was not created correctly: $Path"
+    }
+
+    $dpi = [P5SmokeUiNative]::GetDpiForWindow($handle)
+    if ($dpi -eq 0) { $dpi = 96 }
+
+    return [pscustomobject]@{
+        path = $Path
+        width = $width
+        height = $height
+        dpi = [int]$dpi
+        scale_percent = [Math]::Round(($dpi / 96.0) * 100)
+        capture_method = $captureMethod
+    }
+}
+
+function Measure-SmokeWindowHeartbeat {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [int]$Samples = 8,
+        [int]$TimeoutMilliseconds = 1500,
+        [int]$SlowThresholdMilliseconds = 500
+    )
+
+    Initialize-SmokeUiNative
+    $handle = Wait-SmokeMainWindow -Process $Process
+    $latencies = @()
+    $timeouts = 0
+
+    for ($index = 0; $index -lt $Samples; $index++) {
+        Assert-SmokeProcessRunning -Process $Process -Stage 'ui_evidence'
+        $result = [UIntPtr]::Zero
+        $timer = [System.Diagnostics.Stopwatch]::StartNew()
+        $sent = [P5SmokeUiNative]::SendMessageTimeout(
+            $handle,
+            0,
+            [UIntPtr]::Zero,
+            [IntPtr]::Zero,
+            2,
+            [uint32]$TimeoutMilliseconds,
+            [ref]$result
+        )
+        $timer.Stop()
+
+        $elapsed = [Math]::Round($timer.Elapsed.TotalMilliseconds, 1)
+        if ($sent -eq [IntPtr]::Zero) {
+            $timeouts++
+            $elapsed = $TimeoutMilliseconds
+        }
+        $latencies += $elapsed
+        Start-Sleep -Milliseconds 100
+    }
+
+    $slowSamples = @($latencies | Where-Object { $_ -gt $SlowThresholdMilliseconds }).Count
+    $average = if ($latencies.Count -gt 0) {
+        [Math]::Round((($latencies | Measure-Object -Average).Average), 1)
+    } else { 0 }
+    $maximum = if ($latencies.Count -gt 0) {
+        [Math]::Round((($latencies | Measure-Object -Maximum).Maximum), 1)
+    } else { 0 }
+
+    return [pscustomobject]@{
+        scope = 'idle_after_ai_panel_open'
+        samples_ms = $latencies
+        average_ms = $average
+        max_ms = $maximum
+        timeout_count = $timeouts
+        slow_threshold_ms = $SlowThresholdMilliseconds
+        slow_sample_count = $slowSamples
+        pass = ($timeouts -eq 0 -and $slowSamples -lt 2)
+    }
+}
+
