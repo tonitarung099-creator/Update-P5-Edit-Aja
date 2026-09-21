@@ -8,8 +8,8 @@ Do not describe this audit as a complete interactive Windows UI test.
 ## Verified baseline (refresh before changing anything)
 
 - Repository: `tonitarung099-creator/Update-P5-Edit-Aja` (not Edit-Aja-Gemini).
-- Audited main: `dfbc232861a7d9466214228e1ca8e4fcb92355a1`.
-- Main quality run `35558927632` (#60): PASS.
+- Continuation main before UI-03: `183da535fcfb934309d586bc0d7c758a320fbd5e`.
+- Main quality run `35559542466` (#63): PASS.
 - Latest completed Windows run inspected: `35522742493` (#75), source
   `8c70026cbe7df521ef8c57902ce9801dad2ab304`, job `106109527735`: PASS.
 - #75 actual logs: installer/startup, live AI panel registration/open command,
@@ -18,9 +18,10 @@ Do not describe this audit as a complete interactive Windows UI test.
 - #75 still warns that both smoke uninstall invocations exited -1; uninstall PASS
   must not be inferred from the workflow conclusion.
 - #76 `35558745152` on `1ff97e10092b4bb52853031387e3ec531bb0ca15`
-  was active; #77 `35558960153` on audited main was pending at audit start.
-  Neither is evidence that the latest layout has already worked in a packaged app.
-- Main changes since #75: creator-layout migration and one-click layout restore.
+  remains active at this continuation; #78 `35559601944` on `183da535...` is
+  pending. Neither is evidence for the UI-03 async change in this branch.
+- Main changes since #75: creator-layout migration, one-click layout restore and
+  AI request lifecycle guards from PR #40.
 - Open PRs at audit start: none. Other chats can modify this repo: refresh main,
   PRs and run lineage immediately before pushing/merging.
 
@@ -85,8 +86,9 @@ first pass; use a local delayed/error HTTP fixture for network lifecycle tests.
 4. For UI-01/02 run the standalone Qt test using the actual reconstructed agent and
    registry (instructions in tests/qt-agent/README.md). Existing source gate also
    compiles/runs it. It requires no API account and does not verify full editor UI.
-5. Prioritize UI-03 async process contract and UI-10 real screenshot/heartbeat
-   evidence, then UI-05 geometry/persistence and UI-08 reopen/export. Keep focused PRs.
+5. Finish UI-03 PR/source/Windows verification first. Then prioritize UI-10 real
+   screenshot/heartbeat evidence and UI-04 remaining blocking call sites; follow
+   with UI-05 geometry/persistence and UI-08 reopen/export. Keep focused PRs.
 6. Before merging: relevant tests, complete diff review, all quality gates green;
    after merging track exact-source Windows build separately. Preserve active builds.
 7. Update this file with completed IDs, exact tests and unresolved risks. Do not mark
