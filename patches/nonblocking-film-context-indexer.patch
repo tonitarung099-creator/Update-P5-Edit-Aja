@@ -1,0 +1,46 @@
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -448,6 +448,19 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+ 
+     m_filmContextIndexer = new QProcess(this);
+     m_filmContextIndexer->setProcessChannelMode(QProcess::MergedChannels);
++    connect(m_filmContextIndexer, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
++        if (error != QProcess::FailedToStart) {
++            return;
++        }
++        m_filmContextBuildButton->setEnabled(true);
++        m_filmContextVisualButton->setEnabled(true);
++        const QString operation = m_filmContextIndexer->property("filmContextOperation").toString();
++        if (operation == QLatin1String("visual")) {
++            m_filmContextStatus->setText(i18n("Could not start the optional local visual indexer: %1", m_filmContextIndexer->errorString()));
++        } else {
++            m_filmContextStatus->setText(i18n("Could not start the local Film Context indexer: %1", m_filmContextIndexer->errorString()));
++        }
++    });
+     connect(m_filmContextEnabled, &QCheckBox::toggled, this, [this](bool enabled) {
+         QSettings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent")).setValue(QStringLiteral("filmContextEnabled"), enabled);
+         refreshFilmContextStatus();
+@@ -499,11 +512,6 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+         m_filmContextBuildButton->setEnabled(false);
+         m_filmContextVisualButton->setEnabled(false);
+         m_filmContextIndexer->start(python, arguments);
+-        if (!m_filmContextIndexer->waitForStarted(3000)) {
+-            m_filmContextBuildButton->setEnabled(true);
+-            m_filmContextVisualButton->setEnabled(true);
+-            m_filmContextStatus->setText(i18n("Could not start the local Film Context indexer."));
+-        }
+     });
+     connect(m_filmContextVisualButton, &QPushButton::clicked, this, [this]() {
+         if (m_filmContextIndexer->state() != QProcess::NotRunning) {
+@@ -527,11 +535,6 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+         m_filmContextBuildButton->setEnabled(false);
+         m_filmContextVisualButton->setEnabled(false);
+         m_filmContextIndexer->start(python, QStringList{script, QStringLiteral("visual-index"), QStringLiteral("--index-dir"), indexDir});
+-        if (!m_filmContextIndexer->waitForStarted(3000)) {
+-            m_filmContextBuildButton->setEnabled(true);
+-            m_filmContextVisualButton->setEnabled(true);
+-            m_filmContextStatus->setText(i18n("Could not start the optional local visual indexer."));
+-        }
+     });
+     connect(m_filmContextIndexer, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+             [this](int exitCode, QProcess::ExitStatus exitStatus) {

@@ -205,6 +205,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "nonblocking-film-context-indexer",
+      "path": "patches/nonblocking-film-context-indexer.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -279,6 +286,10 @@
     {
       "source": "patches/async-film-context-registration.patch",
       "destination": "craft/editaja/async-film-context-registration.patch"
+    },
+    {
+      "source": "patches/nonblocking-film-context-indexer.patch",
+      "destination": "craft/editaja/nonblocking-film-context-indexer.patch"
     }
   ]
 }
