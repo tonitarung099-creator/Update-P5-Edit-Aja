@@ -271,3 +271,18 @@ an existing destination still requires the public `overwrite=true` permission
 before the overwrite path is used. Reconstruction and Craft apply the same patch
 after the prior native fixes, and source verification requires the corrected
 call shape.
+
+## Packaged Windows UI evidence
+
+The functional portable smoke also captures evidence from the real packaged
+editor window after opening the AI Agent panel. It saves
+\`artifacts/smoke/functional/ui/ai-agent-window.png\` plus
+\`ui-evidence.json\` with the window size, DPI scale and a short WM_NULL
+heartbeat sample. The heartbeat is an idle responsiveness guard: timeouts or
+repeated samples above 500 ms fail that smoke stage.
+
+This evidence is deliberately narrow. One hosted-runner screenshot and idle
+heartbeat do not prove the full DPI matrix, keyboard/focus behavior, layout
+persistence, stress behavior, or responsiveness while a slow AI/subprocess job
+is active. Those remain separate UI acceptance work.
+
