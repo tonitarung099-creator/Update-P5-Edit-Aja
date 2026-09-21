@@ -1,6 +1,6 @@
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -38,6 +38,7 @@
+@@ -41,6 +41,7 @@
  #include <QScrollArea>
  #include <QSizePolicy>
  #include <QSet>
@@ -8,7 +8,8 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -573,3 +574,14 @@
+@@ -572,6 +573,17 @@
+     m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
      apiForm->addRow(i18n("API key"), m_apiKey);
  
 +    auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
@@ -23,13 +24,21 @@
 +    });
 +
      m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
-@@ -1585,4 +1598,5 @@
+     m_fullAccess->setChecked(true);
+     m_fullAccess->setToolTip(i18n("When enabled, the API model can use native editing tools and trigger any action exposed by Update P5 Edit Aja. Use Undo/versioned project files for reversible work."));
+@@ -1585,6 +1597,7 @@
      QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
      settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
      settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
 +    const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
  
-@@ -1598,2 +1612,3 @@
+     m_output->clear();
+     appendTrace(QStringLiteral("<b>%1</b> %2").arg(i18n("You:"), prompt.toHtmlEscaped()));
+@@ -1596,6 +1609,7 @@
+     }
+ 
      m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
 +    m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000);
      const int maxRounds = m_autonomousMode->isChecked() ? 96 : 32;
+     m_agent->run(prompt, m_fullAccess->isChecked(), maxRounds, m_attachVisionFrames->isChecked());
+ }
