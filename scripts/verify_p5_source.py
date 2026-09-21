@@ -36,6 +36,8 @@ TEXT_CHECKS = [
     ("src/mainwindow.cpp", r"Location_OnLeft, m_projectMonitorDock", "Creator layout media-left docking"),
     ("src/mainwindow.cpp", r"Location_OnRight, m_projectMonitorDock", "Creator layout AI/properties-right docking"),
     ("src/mainwindow.cpp", r"Location_OnBottom, nullptr, timelineSize", "Creator layout full-width bottom timeline"),
+    ("src/mainwindow.cpp", r"void MainWindow::applyCreatorLayout\(\)", "Reusable Creator Layout restore action"),
+    ("src/mainwindow.cpp", r"creatorLayoutButton", "Creator Workspace Layout restore button"),
 ]
 
 
