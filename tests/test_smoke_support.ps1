@@ -18,6 +18,20 @@ try {
     # Already-exited process cleanup must preserve the original failure.
     Stop-SmokeProcessTree -Process $exited
 
+    # Portable extraction must locate bin\kdenlive.exe without any installer
+    # registry or uninstall metadata.
+    $portablePackageRoot = Join-Path $root 'portable-package'
+    $portableSource = Join-Path $root 'portable-source'
+    $portableExtract = Join-Path $root 'portable-extract'
+    New-Item -ItemType Directory -Force (Join-Path $portableSource 'bin') | Out-Null
+    [System.IO.File]::WriteAllBytes((Join-Path $portableSource 'bin\kdenlive.exe'), [byte[]](1, 2, 3))
+    New-Item -ItemType Directory -Force $portablePackageRoot | Out-Null
+    $portableZip = Join-Path $portablePackageRoot 'Update-P5-Edit-Aja-Portable-Windows-x64.zip'
+    Compress-Archive -Path (Join-Path $portableSource '*') -DestinationPath $portableZip
+    $portable = Expand-EditAjaPortable -PackageRoot $portablePackageRoot -DestinationRoot $portableExtract
+    if (-not (Test-Path -LiteralPath $portable.App -PathType Leaf)) { throw 'Portable helper did not locate the application executable.' }
+    if ([System.IO.Path]::GetFileName($portable.App) -ne 'kdenlive.exe') { throw 'Portable helper selected the wrong executable.' }
+
     $token = 'fixture-secret-73'
     $discovery = Join-Path $root 'discovery.json'
     @{ token = $token } | ConvertTo-Json | Set-Content $discovery
@@ -57,6 +71,6 @@ try {
     Export-SmokeDiagnostics -Directory $badDestination -Stage 'bridge' -Status 'FAIL' -LogPaths @($log) -DiscoveryFile $discovery
     if (Test-Path (Join-Path $badDestination 'stderr.txt')) { throw 'Unredacted logs were exported with malformed discovery data.' }
     if (-not (Test-Path (Join-Path $badDestination 'result.json'))) { throw 'Failure-stage report is missing.' }
-    Write-Host 'Smoke support tests PASS: process exit, cleanup, stage evidence, redaction, empty/missing logs, malformed discovery.'
+    Write-Host 'Smoke support tests PASS: portable extraction, process exit, cleanup, stage evidence, redaction, empty/missing logs, malformed discovery.'
 }
 finally { Remove-Item $root -Recurse -Force }
