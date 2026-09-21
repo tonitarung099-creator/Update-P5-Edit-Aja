@@ -1,0 +1,111 @@
+--- a/src/mainwindow.h
++++ b/src/mainwindow.h
+@@ -249,6 +249,8 @@
+     void updateAudioWaveformActionIcon();
+     /** @brief Adds a simple Filmora-inspired creator toolbar without copying proprietary assets. */
+     void setupCreatorWorkspace();
++    /** @brief Restores the Edit Aja creator panel arrangement without touching editing state. */
++    void applyCreatorLayout();
+ 
+     OtioExport *m_otioExport{nullptr};
+     OtioImport *m_otioImport{nullptr};
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -2972,6 +2972,47 @@
+     }
+ }
+ 
++void MainWindow::applyCreatorLayout()
++{
++    if (!m_projectBinDock || !m_projectMonitorDock || !m_effectStackDock || !m_timelineDock) {
++        return;
++    }
++
++    const QSize dockWindowSize = mainDockWindow->size();
++    const QSize timelineSize(0, qMax(260, dockWindowSize.height() * 44 / 100));
++    const QSize binSize(qMax(280, dockWindowSize.width() * 23 / 100), qMax(320, dockWindowSize.height() * 54 / 100));
++    const QSize sidebarSize(qMax(340, dockWindowSize.width() * 26 / 100), qMax(320, dockWindowSize.height() * 54 / 100));
++
++    if (m_clipMonitorDock) {
++        m_clipMonitorDock->close();
++    }
++    if (m_mixerDock) {
++        m_mixerDock->close();
++    }
++
++    m_projectBinDock->open();
++    m_projectMonitorDock->open();
++    m_timelineDock->open();
++    m_effectStackDock->open();
++
++    mainDockWindow->addDockWidget(m_timelineDock, KDDockWidgets::Location_OnBottom, nullptr, timelineSize);
++    mainDockWindow->addDockWidget(m_projectBinDock, KDDockWidgets::Location_OnLeft, m_projectMonitorDock, binSize);
++    mainDockWindow->addDockWidget(m_effectStackDock, KDDockWidgets::Location_OnRight, m_projectMonitorDock, sidebarSize);
++    m_projectMonitorDock->setAsCurrentTab();
++
++    if (m_aiAssistantDock) {
++        auto *rightGroup = m_effectStackDock->asGroupController();
++        if (!rightGroup || !rightGroup->containsDockWidget(m_aiAssistantDock->asDockWidgetController())) {
++            m_effectStackDock->addDockWidgetAsTab(m_aiAssistantDock);
++        }
++        m_aiAssistantDock->open();
++        m_aiAssistantDock->setAsCurrentTab();
++    }
++
++    QSettings editAjaSettings;
++    editAjaSettings.setValue(QStringLiteral("editaja/creatorLayoutVersion"), 1);
++}
++
+ void MainWindow::setupCreatorWorkspace()
+ {
+     if (findChild<QToolBar *>(QStringLiteral("creatorWorkspaceToolBar"))) {
+@@ -3020,6 +3061,10 @@
+         }
+     });
+ 
++    auto *layoutButton = addWorkspaceButton(i18n("Layout"), QStringLiteral("view-grid"), [this]() { applyCreatorLayout(); });
++    layoutButton->setObjectName(QStringLiteral("creatorLayoutButton"));
++    layoutButton->setToolTip(i18n("Restore the Edit Aja creator layout: Media left, viewer center, AI right, timeline below."));
++
+     bar->addSeparator();
+ 
+     auto *aiAgentButton = addWorkspaceButton(i18n("AI Agent"), QStringLiteral("tools-wizard"), [this]() {
+@@ -3160,35 +3205,9 @@
+ 
+     pCore->restoreLayout();
+ 
+-    // Migrate once to the Edit Aja creator layout: Media on the left, one large
+-    // project viewer in the center, AI/properties on the right, and a full-width
+-    // timeline below. After migration the normal saved layout remains user-owned.
+-    if (savedCreatorLayoutVersion < creatorLayoutVersion && m_projectBinDock && m_projectMonitorDock && m_effectStackDock && m_timelineDock) {
+-        const QSize dockWindowSize = mainDockWindow->size();
+-        const QSize timelineSize(0, qMax(260, dockWindowSize.height() * 44 / 100));
+-        const QSize binSize(qMax(280, dockWindowSize.width() * 23 / 100), qMax(320, dockWindowSize.height() * 54 / 100));
+-        const QSize sidebarSize(qMax(340, dockWindowSize.width() * 26 / 100), qMax(320, dockWindowSize.height() * 54 / 100));
+-
+-        if (m_clipMonitorDock) {
+-            m_clipMonitorDock->close();
+-        }
+-        if (m_mixerDock) {
+-            m_mixerDock->close();
+-        }
+-
+-        m_projectBinDock->open();
+-        m_projectMonitorDock->open();
+-        m_timelineDock->open();
+-        m_effectStackDock->open();
+-
+-        // Re-dock existing widgets rather than recreating them, preserving every
+-        // native Kdenlive controller and signal connection.
+-        mainDockWindow->addDockWidget(m_timelineDock, KDDockWidgets::Location_OnBottom, nullptr, timelineSize);
+-        mainDockWindow->addDockWidget(m_projectBinDock, KDDockWidgets::Location_OnLeft, m_projectMonitorDock, binSize);
+-        mainDockWindow->addDockWidget(m_effectStackDock, KDDockWidgets::Location_OnRight, m_projectMonitorDock, sidebarSize);
+-        m_projectMonitorDock->setAsCurrentTab();
+-
+-        editAjaSettings.setValue(QStringLiteral("editaja/creatorLayoutVersion"), creatorLayoutVersion);
++    // Migrate once; after that the normal saved layout remains user-owned.
++    if (savedCreatorLayoutVersion < creatorLayoutVersion) {
++        applyCreatorLayout();
+     }
+ 
+     // Keep AI Agent as the primary right sidebar after restoring older workspace layouts.
