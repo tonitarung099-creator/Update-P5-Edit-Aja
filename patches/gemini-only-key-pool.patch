@@ -232,44 +232,42 @@
          fail(QStringLiteral("API error: %1\n%2").arg(reply->errorString(), QString::fromUtf8(bytes.left(4000))));
          return;
      }
+diff --git a/src/aiassistant/aiassistantwidget.cpp b/src/aiassistant/aiassistantwidget.cpp
+index a4e6448..14fed4e 100644
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -37,6 +37,7 @@
- #include <QPushButton>
- #include <QProcess>
+@@ -39,2 +39,3 @@
  #include <QPointer>
 +#include <QPlainTextEdit>
  #include <QRegularExpression>
- #include <QScrollArea>
- #include <QSizePolicy>
-@@ -581,20 +582,39 @@
-             });
-     refreshFilmContextStatus();
+@@ -583,4 +584,7 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
  
 -    auto *apiGroup = new QGroupBox(i18n("API agent"), this);
 +    auto *apiGroup = new QGroupBox(i18n("Gemini AI"), this);
      auto *apiForm = new QFormLayout(apiGroup);
- 
--    m_apiUrl = new QLineEdit(settings.value(QStringLiteral("apiUrl"), QStringLiteral("http://127.0.0.1:11434/v1/chat/completions")).toString(), apiGroup);
--    m_apiUrl->setPlaceholderText(QStringLiteral("https://.../v1/chat/completions"));
--    apiForm->addRow(i18n("Chat API URL"), m_apiUrl);
--
--    m_model = new QLineEdit(settings.value(QStringLiteral("model"), QStringLiteral("qwen3:8b")).toString(), apiGroup);
--    apiForm->addRow(i18n("Model"), m_model);
--
--    m_apiKey = new QLineEdit(apiGroup);
--    m_apiKey->setEchoMode(QLineEdit::Password);
--    m_apiKey->setPlaceholderText(i18n("Optional; kept in memory only"));
--    apiForm->addRow(i18n("API key"), m_apiKey);
 +    auto *geminiOnly = new QLabel(i18n("Provider: Google Gemini only · API keys stay in memory for this app session"), apiGroup);
 +    geminiOnly->setWordWrap(true);
 +    apiForm->addRow(geminiOnly);
-+
+ 
+@@ -589,5 +593,9 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+     apiForm->addRow(i18n("Chat API URL"), m_apiUrl);
++    m_apiUrl->hide();
++    if (auto *apiUrlLabel = apiForm->labelForField(m_apiUrl)) { apiUrlLabel->hide(); }
+ 
+-    m_model = new QLineEdit(settings.value(QStringLiteral("model"), QStringLiteral("qwen3:8b")).toString(), apiGroup);
+-    apiForm->addRow(i18n("Model"), m_model);
 +    m_model = new QLineEdit(settings.value(QStringLiteral("model"), QStringLiteral("gemini-2.5-flash")).toString(), apiGroup);
 +    m_model->setPlaceholderText(QStringLiteral("gemini-2.5-flash"));
 +    m_model->setToolTip(i18n("Only Gemini model IDs are accepted, for example gemini-2.5-flash."));
 +    apiForm->addRow(i18n("Gemini model"), m_model);
-+
+ 
+@@ -597,2 +605,4 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+     apiForm->addRow(i18n("API key"), m_apiKey);
++    m_apiKey->hide();
++    if (auto *apiKeyLabel = apiForm->labelForField(m_apiKey)) { apiKeyLabel->hide(); }
+ 
+@@ -629,2 +639,24 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+ 
 +    auto *geminiApiKeys = new QPlainTextEdit(apiGroup);
 +    geminiApiKeys->setObjectName(QStringLiteral("geminiApiKeyPool"));
 +    geminiApiKeys->setPlaceholderText(i18n("Paste Gemini API keys here — one key per line, maximum 100"));
@@ -291,23 +289,16 @@
 +        }
 +        geminiKeyStatus->setText(i18n("%1 / 100 keys loaded · automatic rotation on quota/rate limit", uniqueKeys.size()));
 +    });
- 
-     m_fullAccess = new QCheckBox(i18n("Full editor access (native timeline tools + all Update P5 Edit Aja actions)"), apiGroup);
-     m_fullAccess->setChecked(true);
-@@ -1619,8 +1639,8 @@
-     }
- 
++
+     toolBox->addItem(apiGroup, i18n("API"));
+@@ -1621,4 +1653,4 @@ void AiAssistantWidget::runAgent()
      QSettings settings(QStringLiteral("KdenliveOpenAgent"), QStringLiteral("Agent"));
 -    settings.setValue(QStringLiteral("apiUrl"), m_apiUrl->text().trimmed());
 -    settings.setValue(QStringLiteral("model"), m_model->text().trimmed());
 +    const QString geminiModel = m_model->text().trimmed();
 +    settings.setValue(QStringLiteral("model"), geminiModel);
      const int requestTimeoutSeconds = qBound(15, settings.value(QStringLiteral("requestTimeoutSeconds"), 600).toInt(), 3600);
- 
-     m_output->clear();
-@@ -1632,7 +1652,37 @@
-                         .arg(i18n("Checkpoint:"), QString::fromUtf8(QJsonDocument(checkpoint).toJson(QJsonDocument::Compact)).toHtmlEscaped()));
-     }
+@@ -1634,3 +1666,33 @@ void AiAssistantWidget::runAgent()
  
 -    m_agent->configure(m_apiUrl->text(), m_model->text(), m_apiKey->text());
 +    if (!geminiModel.startsWith(QStringLiteral("gemini-"), Qt::CaseInsensitive)) {
@@ -342,5 +333,3 @@
 +
 +    m_agent->configure(QStringLiteral("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), geminiModel, apiKeys.join(QLatin1Char('\n')));
      m_agent->setRequestTimeoutMs(requestTimeoutSeconds * 1000);
-     const int maxRounds = m_autonomousMode->isChecked() ? 96 : 32;
-     m_agent->run(prompt, m_fullAccess->isChecked(), maxRounds, m_attachVisionFrames->isChecked());
