@@ -36,7 +36,12 @@
 +
 +bool isGeminiEndpoint(const QString &url)
 +{
-+    return url.trimmed().compare(QLatin1String(kGeminiChatCompletionsUrl), Qt::CaseInsensitive) == 0;
++    const QString normalized = url.trimmed();
++    if (normalized.compare(QLatin1String(kGeminiChatCompletionsUrl), Qt::CaseInsensitive) == 0) {
++        return true;
++    }
++    const QByteArray testOverride = qgetenv("P5_GEMINI_API_ENDPOINT_OVERRIDE");
++    return !testOverride.isEmpty() && normalized == QString::fromUtf8(testOverride).trimmed();
 +}
 +
 +QStringList sanitizeGeminiApiKeys(const QString &raw)
