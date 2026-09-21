@@ -8,7 +8,7 @@
  #include <QStandardPaths>
  #include <QSettings>
  #include <QTextBrowser>
-@@ -573,3 +574,15 @@
+@@ -573,3 +574,14 @@
      apiForm->addRow(i18n("API key"), m_apiKey);
  
 +    auto *requestTimeoutSeconds = new QSpinBox(apiGroup);
