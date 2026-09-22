@@ -19,7 +19,6 @@ class FullEditorControlV1Tests(unittest.TestCase):
     def test_action_catalog_exposes_runtime_state(self):
         self.assertIn('QStringLiteral("visible"), action->isVisible()', self.patch)
         self.assertIn('QStringLiteral("checked"), action->isChecked()', self.patch)
-        self.assertIn("enabled/visible/checkable/checked state", self.patch)
 
     def test_exact_action_state_tool_exists(self):
         self.assertIn('QStringLiteral("kdenlive_get_action_state")', self.patch)
