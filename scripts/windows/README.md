@@ -184,9 +184,13 @@ adds and reads back a subtitle, and saves a project copy. Each state change is
 read back through the running application's native registry before the step can
 pass.
 
-Render/export is intentionally kept out of this first functional smoke. It will
-be a separate verification boundary so a render failure cannot be confused with
-project loading, native timeline editing, subtitle editing, or project saving.
+The functional smoke now extends that boundary after project save: it closes the
+editor, reopens the saved copy in a fresh process, verifies that the timeline
+split and subtitle survived, renders a short MP4 range through
+`kdenlive_render`, waits for the native render queue to report `finished`,
+and then decodes the produced file with the `ffmpeg.exe` shipped inside the
+portable tree. The smoke writes `render-evidence.json` so reopen, render status,
+output size and decoder evidence remain attributable when a build fails.
 
 
 ### Native subtitle initialization audit
@@ -287,8 +291,9 @@ geometry, closes the application through the normal WM_CLOSE path, relaunches
 the same portable executable, waits for the reopened project to become ready,
 and compares the restored window position and size within bounded pixel
 tolerances. Window selection enumerates visible top-level windows owned by the
-editor process and prefers the largest titled window, avoiding transient Qt/QML
-render or startup windows. It stores before/after screenshots plus
+editor process, rejects `Splash Screen`, requires the Edit Aja application
+title, and selects the largest remaining editor window. It stores before/after
+screenshots plus
 `window-persistence.json` in the same UI diagnostics directory.
 
 Build #88 proved why this selection matters: compilation, portable packaging,
@@ -297,6 +302,13 @@ passed, but the first restart probe captured an untitled 416x208 internal
 window instead of the titled editor window. The regression fix keeps the same
 geometry tolerances; it corrects the measured window rather than weakening the
 acceptance boundary.
+
+Build #90 (`35689293215`, main `654cc26c...`) verified the corrected restart
+boundary on the portable package. Before and after restart the selected editor
+window was `1178x756` at `48,48`, all geometry deltas were zero, and the
+title remained `input / HD 1080p 25 fps - Update P5 Edit Aja`. The same run
+passed packaged startup, AI Agent panel opening, timeline split, subtitle
+creation/readback and project save-copy.
 
 This evidence is still deliberately narrow. It proves one normal window-geometry
 restart on the hosted Windows runner; it does not prove the full DPI matrix,
