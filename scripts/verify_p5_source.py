@@ -87,7 +87,7 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_set_track_state', "Full Editor Control v3 deterministic track-state setter"),
     ("src/mainwindow.cpp", r'isTimelineActive\(\) != desired', "Full Editor Control v3 active-state no-blind-toggle guard"),
     ("src/mainwindow.cpp", r'setTrackLockedState\(trackId, desired\)', "Full Editor Control v3 native track lock path"),
-    ("src/mainwindow.cpp", r'hideTrack\(trackId, desired, false\)', "Full Editor Control v3 native mute/hide path"),
+    ("src/mainwindow.cpp", r'hideTrack\(trackId, current, false\)', "Full Editor Control v3 native mute/hide toggle path"),
 ]
 
 
