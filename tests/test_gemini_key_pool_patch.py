@@ -46,12 +46,15 @@ class GeminiKeyPoolPatchTests(unittest.TestCase):
         self.assertNotIn("requestApiKey)", self.patch)
         self.assertNotIn("Q_EMIT trace(requestApiKey", self.patch)
 
-    def test_gemini_patch_is_last_and_copied_to_craft(self):
-        entry = self.manifest["apply_chain"][-1]
-        self.assertEqual(entry["name"], "gemini-only-key-pool")
+    def test_gemini_patch_precedes_ui_copy_and_is_copied_to_craft(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        gemini_index = names.index("gemini-only-key-pool")
+        entry = self.manifest["apply_chain"][gemini_index]
         self.assertEqual(entry["path"], "patches/gemini-only-key-pool.patch")
         self.assertTrue(entry["check"])
         self.assertTrue(entry["ignore_space_change"])
+        if "gemini-ui-copy" in names:
+            self.assertLess(gemini_index, names.index("gemini-ui-copy"))
 
         payloads = {item["source"]: item["destination"] for item in self.manifest["blueprint_payloads"]}
         self.assertEqual(
@@ -59,7 +62,12 @@ class GeminiKeyPoolPatchTests(unittest.TestCase):
             "craft/editaja/gemini-only-key-pool.patch",
         )
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("gemini-only-key-pool.patch", 1)]'))
+        self.assertIn('("gemini-only-key-pool.patch", 1)', chain)
+        if "gemini-ui-copy" in names:
+            self.assertLess(
+                chain.index('("gemini-only-key-pool.patch", 1)'),
+                chain.index('("gemini-ui-copy.patch", 1)'),
+            )
 
 
 if __name__ == "__main__":

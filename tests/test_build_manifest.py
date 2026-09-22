@@ -62,6 +62,14 @@ class BuildManifestTests(unittest.TestCase):
         actual = {path.name for path in (ROOT / "scripts" / "windows").glob("*.ps1")}
         self.assertTrue(required.issubset(actual))
 
+    def test_patch_precheck_mirrors_ignore_space_policy(self):
+        shared = (ROOT / "scripts" / "reconstruct_source.py").read_text(encoding="utf-8")
+        check_start = shared.index('check_args = ["git", "-C", str(source_root), "apply", "--check"]')
+        run_check = shared.index("run(*check_args)", check_start)
+        check_block = shared[check_start:run_check]
+        self.assertIn('if entry.get("ignore_space_change"):', check_block)
+        self.assertIn('check_args.append("--ignore-space-change")', check_block)
+
     def test_cross_platform_source_reconstruction_is_canonical(self):
         shared = ROOT / "scripts" / "reconstruct_source.py"
         wrapper = ROOT / "scripts" / "windows" / "reconstruct-source.ps1"

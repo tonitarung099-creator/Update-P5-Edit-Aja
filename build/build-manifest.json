@@ -275,6 +275,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "gemini-ui-copy",
+      "path": "patches/gemini-ui-copy.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -389,6 +396,10 @@
     {
       "source": "patches/gemini-only-key-pool.patch",
       "destination": "craft/editaja/gemini-only-key-pool.patch"
+    },
+    {
+      "source": "patches/gemini-ui-copy.patch",
+      "destination": "craft/editaja/gemini-ui-copy.patch"
     }
   ]
 }

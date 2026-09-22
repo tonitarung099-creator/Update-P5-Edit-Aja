@@ -32,15 +32,11 @@ def apply_patch(root: Path, source_root: Path, entry: dict) -> None:
     strip = int(entry["strip"])
 
     if entry.get("check"):
-        run(
-            "git",
-            "-C",
-            str(source_root),
-            "apply",
-            "--check",
-            f"-p{strip}",
-            str(patch_path),
-        )
+        check_args = ["git", "-C", str(source_root), "apply", "--check"]
+        if entry.get("ignore_space_change"):
+            check_args.append("--ignore-space-change")
+        check_args.extend((f"-p{strip}", str(patch_path)))
+        run(*check_args)
 
     args = ["git", "-C", str(source_root), "apply"]
     if entry.get("ignore_space_change"):
