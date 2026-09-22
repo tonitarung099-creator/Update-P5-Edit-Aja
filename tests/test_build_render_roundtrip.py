@@ -68,6 +68,22 @@ class BuildRenderRoundTripTests(unittest.TestCase):
         self.assertIn("full-editor-action-state.json", self.functional)
         self.assertIn("Full Editor Control action-state PASS", self.functional)
 
+    def test_full_editor_track_state_round_trip_is_exercised(self):
+        for tool in ("kdenlive_get_track_state", "kdenlive_set_track_state"):
+            self.assertIn(f"'{tool}'", self.functional)
+
+        project_load = self.functional.index("$stage = 'project_load'")
+        track_state = self.functional.index("$stage = 'full_editor_track_state'")
+        guides = self.functional.index("$stage = 'full_editor_guides'")
+        self.assertLess(project_load, track_state)
+        self.assertLess(track_state, guides)
+
+        self.assertIn("$targetLocked = -not $originalLocked", self.functional)
+        self.assertIn("locked = $targetLocked", self.functional)
+        self.assertIn("locked = $originalLocked", self.functional)
+        self.assertIn("full-editor-track-state.json", self.functional)
+        self.assertIn("Full Editor Control track-state PASS", self.functional)
+
     def test_full_editor_guides_round_trip_is_exercised(self):
         for tool in (
             "kdenlive_list_guides",
@@ -96,7 +112,7 @@ class BuildRenderRoundTripTests(unittest.TestCase):
         self.assertIn("render_request = $renderRequest", self.functional)
         self.assertIn("render_status = $renderFinished.status", self.functional)
         self.assertIn("decode = $decodeEvidence", self.functional)
-        self.assertIn("project save-copy, fresh-process reopen, render/export, and packaged-media decode", self.functional)
+        self.assertIn("deterministic track-state control, project guide round-trip, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode", self.functional)
 
 
 if __name__ == "__main__":
