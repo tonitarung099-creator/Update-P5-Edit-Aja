@@ -14,6 +14,10 @@ try {
     if (-not ('P5SmokeUiNative' -as [type]).GetMethod('FindBestTopLevelWindow')) {
         throw 'Windows UI evidence helper is missing robust top-level window selection.'
     }
+    $supportSource = Get-Content "$PSScriptRoot\..\scripts\windows\smoke-test-support.ps1" -Raw
+    if (-not $supportSource.Contains('Splash Screen') -or -not $supportSource.Contains('Update P5 Edit Aja')) {
+        throw 'Windows UI evidence helper does not explicitly reject the splash screen and identify Edit Aja windows.'
+    }
     Assert-SmokeProcessRunning -Process (Get-Process -Id $PID) -Stage 'running fixture'
     $pwsh = (Get-Process -Id $PID).Path
     $exited = Start-Process -FilePath $pwsh -ArgumentList @('-NoProfile', '-Command', 'exit 7') -PassThru -Wait
