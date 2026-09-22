@@ -44,16 +44,17 @@ index 8508709..92027df 100644
 +                    return errorResult(QStringLiteral("Unknown track_id"));
 +                }
 +                const auto track = model->getTrackById_const(trackId);
-+                return QJsonObject{{QStringLiteral("ok"), true},
++                const bool audio = track->isAudioTrack();
++                QJsonObject result{{QStringLiteral("ok"), true},
 +                                   {QStringLiteral("track_id"), trackId},
 +                                   {QStringLiteral("position"), model->getTrackPosition(trackId)},
-+                                   {QStringLiteral("audio"), track->isAudioTrack()},
++                                   {QStringLiteral("audio"), audio},
 +                                   {QStringLiteral("name"), model->getTrackProperty(trackId, QStringLiteral("kdenlive:track_name")).toString()},
 +                                   {QStringLiteral("locked"), track->isLocked()},
 +                                   {QStringLiteral("active"), track->isTimelineActive()},
-+                                   {QStringLiteral("hidden"), track->isHidden()},
-+                                   {QStringLiteral("muted"), track->isMute()},
 +                                   {QStringLiteral("effects_enabled"), track->stackEnabled()}};
++                result.insert(audio ? QStringLiteral("muted") : QStringLiteral("hidden"), audio ? track->isMute() : track->isHidden());
++                return result;
 +            }
 +
 +            if (toolName == QLatin1String("kdenlive_set_track_state")) {
@@ -129,18 +130,18 @@ index 8508709..92027df 100644
 +                }
 +
 +                const auto finalTrack = model->getTrackById_const(trackId);
-+                return QJsonObject{{QStringLiteral("ok"), true},
++                QJsonObject result{{QStringLiteral("ok"), true},
 +                                   {QStringLiteral("operation"), toolName},
 +                                   {QStringLiteral("track_id"), trackId},
 +                                   {QStringLiteral("position"), model->getTrackPosition(trackId)},
-+                                   {QStringLiteral("audio"), finalTrack->isAudioTrack()},
++                                   {QStringLiteral("audio"), audio},
 +                                   {QStringLiteral("name"), model->getTrackProperty(trackId, QStringLiteral("kdenlive:track_name")).toString()},
 +                                   {QStringLiteral("locked"), finalTrack->isLocked()},
 +                                   {QStringLiteral("active"), finalTrack->isTimelineActive()},
-+                                   {QStringLiteral("hidden"), finalTrack->isHidden()},
-+                                   {QStringLiteral("muted"), finalTrack->isMute()},
 +                                   {QStringLiteral("effects_enabled"), finalTrack->stackEnabled()},
 +                                   {QStringLiteral("changed_fields"), changedFields}};
++                result.insert(audio ? QStringLiteral("muted") : QStringLiteral("hidden"), audio ? finalTrack->isMute() : finalTrack->isHidden());
++                return result;
 +            }
 +
  
