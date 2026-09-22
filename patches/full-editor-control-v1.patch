@@ -35,7 +35,7 @@ index 14fed4e..441493f 100644
 +        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
 +                    {QStringLiteral("properties"),
 +                     QJsonObject{{QStringLiteral("action_name"), stringProperty},
-+                                 {QStringLiteral("checked"), booleanProperty}}},
++                                 {QStringLiteral("checked"), QJsonObject{{QStringLiteral("type"), QStringLiteral("boolean")}}}}},
 +                    {QStringLiteral("required"), QJsonArray{QStringLiteral("action_name"), QStringLiteral("checked")}}},
 +        [this](const QJsonObject &arguments) {
 +            if (!m_actionCatalog || !m_actionExecutor) {
