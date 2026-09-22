@@ -142,6 +142,27 @@ function Wait-ProjectLoaded {
 }
 
 
+function Wait-ActionCheckedState {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaseUrl,
+        [Parameter(Mandatory = $true)][string]$Token,
+        [Parameter(Mandatory = $true)][string]$ActionName,
+        [Parameter(Mandatory = $true)][bool]$ExpectedChecked,
+        [int]$TimeoutSeconds = 5
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $last = $null
+    while ((Get-Date) -lt $deadline) {
+        $last = Invoke-AgentTool -BaseUrl $BaseUrl -Token $Token -Name 'kdenlive_get_action_state' -Arguments @{ action_name = $ActionName }
+        if ([bool]$last.checked -eq $ExpectedChecked) {
+            return $last
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    throw "Action '$ActionName' did not reach checked=$ExpectedChecked within $TimeoutSeconds seconds. Last state: $($last | ConvertTo-Json -Depth 10 -Compress)"
+}
+
 function Wait-RenderFinished {
     param(
         [Parameter(Mandatory = $true)][string]$BaseUrl,
@@ -259,7 +280,9 @@ try {
         'kdenlive_list_subtitles',
         'kdenlive_save_project',
         'kdenlive_list_panels',
-        'kdenlive_open_panel'
+        'kdenlive_open_panel',
+        'kdenlive_get_action_state',
+        'kdenlive_set_action_checked'
     )
     foreach ($required in $requiredTools) {
         if ($toolNames -notcontains $required) {
@@ -281,6 +304,39 @@ try {
     }
     Write-Host 'AI Agent panel PASS: registered and openable through the live packaged editor.'
 
+    $stage = 'full_editor_action_state'
+    $testActionName = 'audiomixer_button'
+    $actionBefore = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_action_state' -Arguments @{ action_name = $testActionName }
+    if (-not [bool]$actionBefore.checkable) {
+        throw "Full Editor Control smoke action is unexpectedly not checkable: $($actionBefore | ConvertTo-Json -Depth 10 -Compress)"
+    }
+    if (-not [bool]$actionBefore.enabled) {
+        throw "Full Editor Control smoke action is unexpectedly disabled: $($actionBefore | ConvertTo-Json -Depth 10 -Compress)"
+    }
+
+    $originalChecked = [bool]$actionBefore.checked
+    $targetChecked = -not $originalChecked
+    $setAction = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_set_action_checked' -Arguments @{ action_name = $testActionName; checked = $targetChecked }
+    $actionChanged = Wait-ActionCheckedState -BaseUrl $baseUrl -Token $token -ActionName $testActionName -ExpectedChecked $targetChecked
+
+    [void](Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_set_action_checked' -Arguments @{ action_name = $testActionName; checked = $originalChecked })
+    $actionRestored = Wait-ActionCheckedState -BaseUrl $baseUrl -Token $token -ActionName $testActionName -ExpectedChecked $originalChecked
+
+    $actionEvidence = [ordered]@{
+        action = $testActionName
+        before = $actionBefore
+        requested_checked = $targetChecked
+        setter_result = $setAction
+        changed_state = $actionChanged
+        restored_state = $actionRestored
+        pass = ([bool]$actionChanged.checked -eq $targetChecked -and [bool]$actionRestored.checked -eq $originalChecked)
+    }
+    New-Item -ItemType Directory -Force $diagnostics | Out-Null
+    $actionEvidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $diagnostics 'full-editor-action-state.json') -Encoding utf8
+    if (-not $actionEvidence.pass) {
+        throw "Full Editor Control action state round trip failed: $($actionEvidence | ConvertTo-Json -Depth 15 -Compress)"
+    }
+    Write-Host "Full Editor Control action-state PASS: $testActionName $originalChecked -> $targetChecked -> $originalChecked."
 
     $stage = 'ui_evidence'
     New-Item -ItemType Directory -Force $uiEvidenceDir | Out-Null
@@ -472,7 +528,7 @@ try {
     Write-Host "Render/decode PASS: $($decodeEvidence.output_path) ($($decodeEvidence.output_size_bytes) bytes)."
 
     $status = 'PASS'
-    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
+    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, deterministic QAction state control, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess
