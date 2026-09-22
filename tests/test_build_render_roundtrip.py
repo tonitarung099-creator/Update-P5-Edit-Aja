@@ -11,6 +11,15 @@ class BuildRenderRoundTripTests(unittest.TestCase):
     def setUpClass(cls):
         cls.functional = FUNCTIONAL.read_text(encoding="utf-8")
 
+    def test_fresh_reopen_does_not_trigger_original_project_save_prompt(self):
+        start = self.functional.index("$stage = 'fresh_reopen_saved_copy'")
+        end = self.functional.index("$stage = 'render_export'")
+        fresh_reopen = self.functional[start:end]
+        self.assertIn("Stop-SmokeProcessTree -Process $appProcess", fresh_reopen)
+        self.assertIn("$appProcess.HasExited", fresh_reopen)
+        self.assertNotIn("Close-SmokeWindowGracefully -Process $appProcess", fresh_reopen)
+        self.assertIn("save_copy intentionally leaves the original project marked modified", fresh_reopen)
+
     def test_saved_copy_is_reopened_in_a_fresh_process_before_render(self):
         save_copy = self.functional.index("$stage = 'save_copy'")
         fresh_reopen = self.functional.index("$stage = 'fresh_reopen_saved_copy'")
