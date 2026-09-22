@@ -34,10 +34,15 @@ class GeminiUiCopyPatchTests(unittest.TestCase):
         )
         self.assertNotIn("AI Agent — Main Control", additions)
 
-    def test_patch_is_after_gemini_pool_and_copied_to_craft(self):
+    def test_patch_is_after_gemini_pool_and_before_later_extensions(self):
         names = [entry["name"] for entry in self.manifest["apply_chain"]]
-        self.assertEqual(names[-2:], ["gemini-only-key-pool", "gemini-ui-copy"])
-        entry = self.manifest["apply_chain"][-1]
+        gemini_index = names.index("gemini-only-key-pool")
+        ui_index = names.index("gemini-ui-copy")
+        self.assertLess(gemini_index, ui_index)
+        if "full-editor-control-v1" in names:
+            self.assertLess(ui_index, names.index("full-editor-control-v1"))
+
+        entry = self.manifest["apply_chain"][ui_index]
         self.assertEqual(entry["path"], "patches/gemini-ui-copy.patch")
         self.assertTrue(entry["check"])
         self.assertTrue(entry["ignore_space_change"])
@@ -48,7 +53,12 @@ class GeminiUiCopyPatchTests(unittest.TestCase):
             "craft/editaja/gemini-ui-copy.patch",
         )
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
-        self.assertTrue(chain.rstrip().endswith('("gemini-ui-copy.patch", 1)]'))
+        self.assertIn('("gemini-ui-copy.patch", 1)', chain)
+        if "full-editor-control-v1" in names:
+            self.assertLess(
+                chain.index('("gemini-ui-copy.patch", 1)'),
+                chain.index('("full-editor-control-v1.patch", 1)'),
+            )
 
 
 if __name__ == "__main__":
