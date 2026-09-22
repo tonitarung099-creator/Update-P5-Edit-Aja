@@ -552,7 +552,17 @@ try {
     Write-Host "Project save-copy PASS: $savedProjectPath"
 
     $stage = 'fresh_reopen_saved_copy'
-    Close-SmokeWindowGracefully -Process $appProcess
+    # save_copy intentionally leaves the original project marked modified. A
+    # normal WM_CLOSE would therefore open a save-changes dialog and invalidate
+    # this headless persistence check. The copy has already been written and
+    # verified above, so terminate only this disposable CI process before
+    # reopening the saved copy in a fresh process. Geometry persistence was
+    # already proven earlier through the normal graceful-close path.
+    Stop-SmokeProcessTree -Process $appProcess
+    $appProcess.Refresh()
+    if (-not $appProcess.HasExited) {
+        throw "Disposable editor process did not exit before fresh saved-copy reopen."
+    }
     $appProcess = $null
     Remove-Item $discoveryPath -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 750
