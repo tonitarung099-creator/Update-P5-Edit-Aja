@@ -34,7 +34,7 @@ diff --git a/src/mainwindow.cpp b/src/mainwindow.cpp
 index 8508709..92027df 100644
 --- a/src/mainwindow.cpp
 +++ b/src/mainwindow.cpp
-@@ -1319,6 +1319,107 @@ void MainWindow::init()
+@@ -1319,6 +1319,112 @@ void MainWindow::init()
                  return result;
              }
  
