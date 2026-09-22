@@ -47,6 +47,18 @@ class BuildRenderRoundTripTests(unittest.TestCase):
         self.assertIn("'NUL'", self.functional)
         self.assertNotIn("Get-Command ffmpeg", self.functional)
 
+    def test_full_editor_action_state_is_exercised_and_restored(self):
+        self.assertIn("'kdenlive_get_action_state'", self.functional)
+        self.assertIn("'kdenlive_set_action_checked'", self.functional)
+        self.assertIn("$stage = 'full_editor_action_state'", self.functional)
+        self.assertIn("$testActionName = 'audiomixer_button'", self.functional)
+        self.assertIn("$targetChecked = -not $originalChecked", self.functional)
+        self.assertIn("Wait-ActionCheckedState", self.functional)
+        self.assertIn("-ExpectedChecked $targetChecked", self.functional)
+        self.assertIn("-ExpectedChecked $originalChecked", self.functional)
+        self.assertIn("full-editor-action-state.json", self.functional)
+        self.assertIn("Full Editor Control action-state PASS", self.functional)
+
     def test_render_evidence_is_persisted(self):
         self.assertIn("render-evidence.json", self.functional)
         self.assertIn("render_request = $renderRequest", self.functional)
