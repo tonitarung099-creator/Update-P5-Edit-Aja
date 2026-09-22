@@ -282,7 +282,11 @@ try {
         'kdenlive_list_panels',
         'kdenlive_open_panel',
         'kdenlive_get_action_state',
-        'kdenlive_set_action_checked'
+        'kdenlive_set_action_checked',
+        'kdenlive_list_guides',
+        'kdenlive_add_guide',
+        'kdenlive_edit_guide',
+        'kdenlive_delete_guide'
     )
     foreach ($required in $requiredTools) {
         if ($toolNames -notcontains $required) {
@@ -413,6 +417,86 @@ try {
     $stage = 'project_load'
     Write-Host "Project load PASS after restart: $($project.path), duration=$($project.duration_frames) frames."
 
+    $stage = 'full_editor_guides'
+    $guidesBefore = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_guides'
+    $occupiedGuideFrames = @{}
+    foreach ($guide in @($guidesBefore.guides)) {
+        $occupiedGuideFrames[[int]$guide.position_frame] = $true
+    }
+
+    $guideFrame = $null
+    $editedGuideFrame = $null
+    $guideSearchLimit = [Math]::Min(100, [Math]::Max(10, [int]$project.duration_frames - 20))
+    for ($candidate = 5; $candidate -lt $guideSearchLimit; $candidate += 5) {
+        $movedCandidate = $candidate + 2
+        if (-not $occupiedGuideFrames.ContainsKey($candidate) -and -not $occupiedGuideFrames.ContainsKey($movedCandidate)) {
+            $guideFrame = $candidate
+            $editedGuideFrame = $movedCandidate
+            break
+        }
+    }
+    if ($null -eq $guideFrame -or $null -eq $editedGuideFrame) {
+        throw "Could not find two free guide frames in the functional smoke project."
+    }
+
+    $guideComment = 'P5 functional smoke guide'
+    $editedGuideComment = 'P5 functional smoke guide edited'
+    $guideAdd = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_add_guide' -Arguments @{
+        position_frame = [int]$guideFrame
+        comment = $guideComment
+    }
+
+    $guidesAfterAdd = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_guides'
+    $addedGuide = @($guidesAfterAdd.guides | Where-Object {
+        [int]$_.position_frame -eq [int]$guideFrame -and $_.comment -eq $guideComment
+    })
+    if ($addedGuide.Count -ne 1 -or [bool]$addedGuide[0].has_range) {
+        throw "Point guide add/list verification failed: $($guidesAfterAdd | ConvertTo-Json -Depth 20 -Compress)"
+    }
+
+    $guideEdit = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_edit_guide' -Arguments @{
+        position_frame = [int]$guideFrame
+        new_position_frame = [int]$editedGuideFrame
+        comment = $editedGuideComment
+        duration_frames = 10
+    }
+
+    $guidesAfterEdit = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_guides'
+    $oldGuideStillPresent = @($guidesAfterEdit.guides | Where-Object { [int]$_.position_frame -eq [int]$guideFrame })
+    $editedGuide = @($guidesAfterEdit.guides | Where-Object {
+        [int]$_.position_frame -eq [int]$editedGuideFrame -and $_.comment -eq $editedGuideComment
+    })
+    if ($oldGuideStillPresent.Count -ne 0 -or $editedGuide.Count -ne 1 -or -not [bool]$editedGuide[0].has_range -or [int]$editedGuide[0].duration_frames -ne 10) {
+        throw "Guide edit/move/range verification failed: $($guidesAfterEdit | ConvertTo-Json -Depth 20 -Compress)"
+    }
+
+    $guideDelete = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_delete_guide' -Arguments @{
+        position_frame = [int]$editedGuideFrame
+    }
+    $guidesAfterDelete = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_guides'
+    $deletedGuideStillPresent = @($guidesAfterDelete.guides | Where-Object {
+        [int]$_.position_frame -eq [int]$editedGuideFrame -and $_.comment -eq $editedGuideComment
+    })
+    if ($deletedGuideStillPresent.Count -ne 0) {
+        throw "Guide delete verification failed: $($guidesAfterDelete | ConvertTo-Json -Depth 20 -Compress)"
+    }
+
+    $guideEvidence = [ordered]@{
+        selected_frame = [int]$guideFrame
+        edited_frame = [int]$editedGuideFrame
+        before = $guidesBefore
+        add_result = $guideAdd
+        after_add = $guidesAfterAdd
+        edit_result = $guideEdit
+        after_edit = $guidesAfterEdit
+        delete_result = $guideDelete
+        after_delete = $guidesAfterDelete
+        pass = $true
+    }
+    New-Item -ItemType Directory -Force $diagnostics | Out-Null
+    $guideEvidence | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $diagnostics 'full-editor-guides.json') -Encoding utf8
+    Write-Host "Full Editor Control guide round-trip PASS: point@$guideFrame -> range@$editedGuideFrame -> deleted."
+
     $stage = 'timeline_split'
     $before = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_timeline_state' -Arguments @{ include_items = $true }
     $clipsBefore = @($before.items | Where-Object { $_.kind -eq 'clip' -and [int]$_.duration_frames -ge 4 })
@@ -528,7 +612,7 @@ try {
     Write-Host "Render/decode PASS: $($decodeEvidence.output_path) ($($decodeEvidence.output_size_bytes) bytes)."
 
     $status = 'PASS'
-    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, deterministic QAction state control, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
+    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, deterministic QAction state control, project guide round-trip, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess
