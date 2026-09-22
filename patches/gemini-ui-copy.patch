@@ -1,8 +1,10 @@
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -308 +308 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
--        i18n("One open tool layer for every agent. Connect an OpenAI-compatible API inside the editor, or let external agents control Update P5 Edit Aja through MCP."), this);
-+        i18n("Built-in AI Agent uses Google Gemini only. Add up to 100 Gemini API keys in the API section; editor tools remain available through the same native tool layer."), this);
-@@ -312 +312 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
--    auto *agentGroup = new QGroupBox(i18n("AI Agent — Main Control"), this);
-+    auto *agentGroup = new QGroupBox(this);
+@@ -309,2 +309,3 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+     description->setWordWrap(true);
++    description->setText(i18n("Built-in AI Agent uses Google Gemini only. Add up to 100 Gemini API keys in the API section; editor tools remain available through the same native tool layer."));
+     layout->addWidget(description);
+@@ -313,2 +314,3 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
+     agentGroup->setObjectName(QStringLiteral("aiAgentMainControl"));
++    agentGroup->setTitle(QString());
+     auto *agentLayout = new QGridLayout(agentGroup);
