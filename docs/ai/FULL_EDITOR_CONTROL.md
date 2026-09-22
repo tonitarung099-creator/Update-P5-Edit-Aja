@@ -20,6 +20,19 @@ This layer makes generic action control safer and less ambiguous.
 
 This is intentionally native editor control. It does not automate mouse coordinates or depend on screen layout.
 
+## Full Editor Control v2 — project guides
+
+Gemini can now work with project timeline guides/markers through typed native tools:
+
+- `kdenlive_list_guides` reads point/range guides with frame/time, comment, category and duration.
+- `kdenlive_add_guide` adds a point guide or a duration-based range guide.
+- `kdenlive_edit_guide` edits text/category/duration or moves a guide.
+- `kdenlive_delete_guide` removes an exact guide.
+- Guide categories are validated against Kdenlive's current marker categories before native model calls.
+- Adding onto an occupied frame is rejected by default; replacement requires explicit `overwrite=true`.
+- Moving an existing guide onto another occupied frame is always rejected to protect Kdenlive's frame-to-guide mapping.
+- Changes use Kdenlive's `MarkerListModel` mutation methods, so normal native undo/redo semantics are retained.
+
 ## Remaining boundary
 
 Actions that open a modal dialog can be launched through the QAction bridge, but the contents of arbitrary dialogs are not automatically editable merely because the dialog was opened. Frequently used editing operations should continue to receive dedicated native tools with typed parameters so Gemini can perform them deterministically and verify the result.
