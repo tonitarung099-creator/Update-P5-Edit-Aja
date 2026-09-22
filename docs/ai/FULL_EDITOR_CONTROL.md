@@ -37,7 +37,7 @@ Gemini can work with project timeline guides/markers through typed native tools:
 
 Gemini can now inspect and set exact timeline-track state without relying on blind toggle actions:
 
-- `kdenlive_get_track_state` reads track position/type, custom name, lock state, active state, mute/hide state and effect-stack state.
+- `kdenlive_get_track_state` reads track position/type, custom name, lock state, active state and effect-stack state, plus only the type-relevant visibility field (`muted` for audio or `hidden` for video).
 - `kdenlive_set_track_state` accepts explicit target values for name, lock, active state and effect-stack state.
 - Audio tracks use the explicit `muted` field; video tracks use the explicit `hidden` field. Cross-type misuse is rejected.
 - Toggle-backed editor behavior is only invoked when the current value differs from the requested value.
