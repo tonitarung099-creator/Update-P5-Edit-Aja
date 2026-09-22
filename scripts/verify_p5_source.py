@@ -77,6 +77,12 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_get_action_state', "Full Editor Control exact QAction state tool"),
     ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_set_action_checked', "Full Editor Control deterministic QAction toggle tool"),
     ("src/aiassistant/aiassistantwidget.cpp", r'beforeChecked == desiredChecked', "Full Editor Control avoids blind toggle"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_list_guides', "Full Editor Control v2 guide list tool"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_add_guide', "Full Editor Control v2 guide add tool"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_edit_guide', "Full Editor Control v2 guide edit tool"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_delete_guide', "Full Editor Control v2 guide delete tool"),
+    ("src/mainwindow.cpp", r'guideModel->addRangeMarker', "Full Editor Control v2 native range-guide path"),
+    ("src/mainwindow.cpp", r'newPosition != position && guideModel->hasMarker\(newPosition\)', "Full Editor Control v2 occupied-target protection"),
 ]
 
 
