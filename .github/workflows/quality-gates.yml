@@ -70,6 +70,7 @@ jobs:
               tests.test_bounded_ai_output_patch
               tests.test_gemini_key_pool_patch
               tests.test_gemini_ui_copy_patch
+              tests.test_full_editor_control_patch
               tests.test_keyframe_api_compile_fix
               tests.test_phase_integration
               tests.test_workflow_presets
