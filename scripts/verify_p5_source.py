@@ -70,6 +70,11 @@ TEXT_CHECKS = [
     ("src/aiassistant/openaicompatibleagent.cpp", r"keys\.size\(\) >= 100", "Gemini API key pool cap"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"httpStatus == 429", "Gemini rate-limit rotation trigger"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"Retry-After", "Gemini key cooldown header"),
+    ("src/mainwindow.cpp", r'QStringLiteral\("checked"\), action->isChecked\(\)', "Full Editor Control QAction checked-state metadata"),
+    ("src/mainwindow.cpp", r'QStringLiteral\("visible"\), action->isVisible\(\)', "Full Editor Control QAction visibility metadata"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_get_action_state', "Full Editor Control exact QAction state tool"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'kdenlive_set_action_checked', "Full Editor Control deterministic QAction toggle tool"),
+    ("src/aiassistant/aiassistantwidget.cpp", r'beforeChecked == desiredChecked', "Full Editor Control avoids blind toggle"),
 ]
 
 
