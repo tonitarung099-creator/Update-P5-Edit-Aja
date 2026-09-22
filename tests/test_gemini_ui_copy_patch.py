@@ -25,8 +25,9 @@ class GeminiUiCopyPatchTests(unittest.TestCase):
         self.assertIn("up to 100 Gemini API keys", additions)
         self.assertNotIn("OpenAI-compatible API", additions)
 
-    def test_redundant_group_title_is_removed(self):
-        self.assertIn("+    auto *agentGroup = new QGroupBox(this);", self.patch)
+    def test_redundant_group_title_is_cleared(self):
+        self.assertIn("+    agentGroup->setTitle(QString());", self.patch)
+        self.assertIn("+    description->setText(i18n(\"Built-in AI Agent uses Google Gemini only.", self.patch)
         additions = "\n".join(
             line[1:] for line in self.patch.splitlines()
             if line.startswith("+") and not line.startswith("+++")
