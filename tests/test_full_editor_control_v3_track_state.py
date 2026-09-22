@@ -36,13 +36,14 @@ class FullEditorControlV3TrackStateTests(unittest.TestCase):
         for marker in (
             "isTimelineActive() != desired",
             "stackEnabled() != desired",
-            "isMute() != desired",
-            "isHidden() != desired",
+            "const bool current = model->getTrackById_const(trackId)->isMute();",
+            "const bool current = model->getTrackById_const(trackId)->isHidden();",
+            "if (current != desired)",
             "isLocked() != desired",
         ):
             self.assertIn(marker, self.patch)
         self.assertIn("controller->switchTrackActive(trackId)", self.patch)
-        self.assertIn("controller->hideTrack(trackId, desired, false)", self.patch)
+        self.assertIn("controller->hideTrack(trackId, current, false)", self.patch)
         self.assertIn("model->setTrackLockedState(trackId, desired)", self.patch)
 
     def test_track_type_specific_visibility_is_guarded(self):
@@ -54,7 +55,7 @@ class FullEditorControlV3TrackStateTests(unittest.TestCase):
             "model->setTrackName(trackId, desired)",
             "model->setTrackStackEnabled(trackId, desired)",
             "model->setTrackLockedState(trackId, desired)",
-            "controller->hideTrack(trackId, desired, false)",
+            "controller->hideTrack(trackId, current, false)",
         ):
             self.assertIn(marker, self.patch)
         self.assertIn("At least one track state field is required", self.patch)
