@@ -33,6 +33,16 @@ Gemini can work with project timeline guides/markers through typed native tools:
 - Moving an existing guide onto another occupied frame is always rejected to protect Kdenlive's frame-to-guide mapping.
 - Mutations use Kdenlive's `MarkerListModel`, retaining native undo/redo semantics.
 
+## Full Editor Control v3 — track state
+
+Gemini can now inspect and set exact timeline-track state without relying on blind toggle actions:
+
+- `kdenlive_get_track_state` reads track position/type, custom name, lock state, active state, mute/hide state and effect-stack state.
+- `kdenlive_set_track_state` accepts explicit target values for name, lock, active state and effect-stack state.
+- Audio tracks use the explicit `muted` field; video tracks use the explicit `hidden` field. Cross-type misuse is rejected.
+- Toggle-backed editor behavior is only invoked when the current value differs from the requested value.
+- Track rename, lock, mute/hide and effect-stack changes use Kdenlive's native model/controller paths; the response returns the final state plus `changed_fields`.
+
 ## Remaining boundary
 
 Actions that open a modal dialog can be launched through the QAction bridge, but the contents of arbitrary dialogs are not automatically editable merely because the dialog was opened. Frequently used editing operations should continue to receive dedicated native tools with typed parameters so Gemini can perform them deterministically and verify the result.
