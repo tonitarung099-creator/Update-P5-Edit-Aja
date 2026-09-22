@@ -24,6 +24,13 @@ class FullEditorControlV1Tests(unittest.TestCase):
         self.assertIn('QStringLiteral("kdenlive_get_action_state")', self.patch)
         self.assertIn("Unknown editor action", self.patch)
 
+    def test_checked_schema_does_not_depend_on_late_boolean_property(self):
+        self.assertNotIn("booleanProperty", self.patch)
+        self.assertIn(
+            'QStringLiteral("checked"), QJsonObject{{QStringLiteral("type"), QStringLiteral("boolean")}}',
+            self.patch,
+        )
+
     def test_checked_action_setter_is_not_blind_toggle(self):
         self.assertIn('QStringLiteral("kdenlive_set_action_checked")', self.patch)
         self.assertIn("beforeChecked == desiredChecked", self.patch)
