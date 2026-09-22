@@ -56,6 +56,12 @@ class BuildRenderRoundTripTests(unittest.TestCase):
         self.assertIn("'NUL'", self.functional)
         self.assertNotIn("Get-Command ffmpeg", self.functional)
 
+    def test_empty_decode_stderr_is_normalized_before_trim(self):
+        self.assertIn("[string](Get-Content $decodeStderr -Raw)", self.functional)
+        self.assertIn("if ($null -eq $stderr)", self.functional)
+        self.assertIn("$stderr = ''", self.functional)
+        self.assertIn("decode_stderr = $stderr.Trim()", self.functional)
+
     def test_full_editor_action_state_is_exercised_and_restored(self):
         self.assertIn("'kdenlive_get_action_state'", self.functional)
         self.assertIn("'kdenlive_set_action_checked'", self.functional)
