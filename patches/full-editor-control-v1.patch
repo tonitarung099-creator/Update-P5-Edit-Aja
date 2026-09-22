@@ -2,15 +2,6 @@ diff --git a/src/aiassistant/aiassistantwidget.cpp b/src/aiassistant/aiassistant
 index 14fed4e..441493f 100644
 --- a/src/aiassistant/aiassistantwidget.cpp
 +++ b/src/aiassistant/aiassistantwidget.cpp
-@@ -1948,7 +1948,7 @@ void AiAssistantWidget::registerTools()
- 
-     m_registry->registerTool(
-         QStringLiteral("kdenlive_list_actions"),
--        QStringLiteral("List Update P5 Edit Aja actions available to the agent. Search this before triggering an unfamiliar action."),
-+        QStringLiteral("List Update P5 Edit Aja actions available to the agent, including enabled/visible/checkable/checked state. Search this before triggering an unfamiliar action."),
-         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
-                     {QStringLiteral("properties"),
-                      QJsonObject{{QStringLiteral("query"), stringProperty},
 @@ -1991,6 +1991,86 @@ void AiAssistantWidget::registerTools()
              return QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("action"), name}, {QStringLiteral("status"), QStringLiteral("sent")}};
          });
