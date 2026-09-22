@@ -1,0 +1,114 @@
+diff --git a/src/aiassistant/aiassistantwidget.cpp b/src/aiassistant/aiassistantwidget.cpp
+index 14fed4e..441493f 100644
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -1948,7 +1948,7 @@ void AiAssistantWidget::registerTools()
+ 
+     m_registry->registerTool(
+         QStringLiteral("kdenlive_list_actions"),
+-        QStringLiteral("List Update P5 Edit Aja actions available to the agent. Search this before triggering an unfamiliar action."),
++        QStringLiteral("List Update P5 Edit Aja actions available to the agent, including enabled/visible/checkable/checked state. Search this before triggering an unfamiliar action."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
+                     {QStringLiteral("properties"),
+                      QJsonObject{{QStringLiteral("query"), stringProperty},
+@@ -1991,6 +1991,86 @@ void AiAssistantWidget::registerTools()
+             return QJsonObject{{QStringLiteral("ok"), true}, {QStringLiteral("action"), name}, {QStringLiteral("status"), QStringLiteral("sent")}};
+         });
+ 
++    m_registry->registerTool(
++        QStringLiteral("kdenlive_get_action_state"),
++        QStringLiteral("Read the exact current state of a registered editor QAction before deciding whether to trigger or toggle it."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"), QJsonObject{{QStringLiteral("action_name"), stringProperty}}},
++                    {QStringLiteral("required"), QJsonArray{QStringLiteral("action_name")}}},
++        [this](const QJsonObject &arguments) {
++            if (!m_actionCatalog) {
++                return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Editor action catalog is not connected yet")}};
++            }
++            const QString name = arguments.value(QStringLiteral("action_name")).toString().trimmed();
++            const QJsonArray source = m_actionCatalog();
++            for (const auto &value : source) {
++                const QJsonObject action = value.toObject();
++                if (action.value(QStringLiteral("name")).toString() == name) {
++                    QJsonObject result = action;
++                    result.insert(QStringLiteral("ok"), true);
++                    return result;
++                }
++            }
++            return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown editor action: %1").arg(name)}};
++        });
++
++    m_registry->registerTool(
++        QStringLiteral("kdenlive_set_action_checked"),
++        QStringLiteral("Set a checkable editor QAction to an explicit checked state without blindly toggling it. Use get_action_state first when unsure."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"),
++                     QJsonObject{{QStringLiteral("action_name"), stringProperty},
++                                 {QStringLiteral("checked"), booleanProperty}}},
++                    {QStringLiteral("required"), QJsonArray{QStringLiteral("action_name"), QStringLiteral("checked")}}},
++        [this](const QJsonObject &arguments) {
++            if (!m_actionCatalog || !m_actionExecutor) {
++                return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Editor action bridge is not connected yet")}};
++            }
++            const QString name = arguments.value(QStringLiteral("action_name")).toString().trimmed();
++            const bool desiredChecked = arguments.value(QStringLiteral("checked")).toBool();
++            auto findAction = [this, &name]() -> QJsonObject {
++                const QJsonArray source = m_actionCatalog();
++                for (const auto &value : source) {
++                    const QJsonObject action = value.toObject();
++                    if (action.value(QStringLiteral("name")).toString() == name) {
++                        return action;
++                    }
++                }
++                return {};
++            };
++
++            const QJsonObject before = findAction();
++            if (before.isEmpty()) {
++                return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Unknown editor action: %1").arg(name)}};
++            }
++            if (!before.value(QStringLiteral("checkable")).toBool()) {
++                return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Editor action is not checkable: %1").arg(name)}};
++            }
++            if (!before.value(QStringLiteral("enabled")).toBool()) {
++                return QJsonObject{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QStringLiteral("Editor action is currently disabled: %1").arg(name)}};
++            }
++
++            const bool beforeChecked = before.value(QStringLiteral("checked")).toBool();
++            if (beforeChecked == desiredChecked) {
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("action"), name},
++                                   {QStringLiteral("checked"), beforeChecked},
++                                   {QStringLiteral("changed"), false},
++                                   {QStringLiteral("target_reached"), true}};
++            }
++
++            QJsonObject result = m_actionExecutor(name);
++            if (!result.value(QStringLiteral("ok")).toBool()) {
++                return result;
++            }
++            const QJsonObject after = findAction();
++            const bool afterChecked = after.value(QStringLiteral("checked")).toBool();
++            result.insert(QStringLiteral("checked"), afterChecked);
++            result.insert(QStringLiteral("changed"), beforeChecked != afterChecked);
++            result.insert(QStringLiteral("target_reached"), afterChecked == desiredChecked);
++            return result;
++        });
++
+     m_registry->registerTool(
+         QStringLiteral("kdenlive_list_panels"), QStringLiteral("List dock panels that can be opened directly."),
+         QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}, {QStringLiteral("properties"), QJsonObject{}}},
+diff --git a/src/mainwindow.cpp b/src/mainwindow.cpp
+index 8508709..36b99be 100644
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -673,7 +673,9 @@ void MainWindow::init()
+                 actions.push_back(QJsonObject{{QStringLiteral("name"), name},
+                                               {QStringLiteral("text"), text},
+                                               {QStringLiteral("enabled"), action->isEnabled()},
++                                              {QStringLiteral("visible"), action->isVisible()},
+                                               {QStringLiteral("checkable"), action->isCheckable()},
++                                              {QStringLiteral("checked"), action->isChecked()},
+                                               {QStringLiteral("shortcut"), action->shortcut().toString(QKeySequence::PortableText)}});
+             }
+             return actions;
