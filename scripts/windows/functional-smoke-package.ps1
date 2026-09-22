@@ -16,6 +16,7 @@ $portableExtractRoot = Join-Path $env:RUNNER_TEMP 'editaja-functional-smoke-port
 $workRoot = Join-Path $env:RUNNER_TEMP 'editaja-functional-smoke'
 $projectPath = Join-Path $workRoot 'input.kdenlive'
 $savedProjectPath = Join-Path $workRoot 'saved-copy.kdenlive'
+$renderOutputPath = Join-Path $workRoot 'render-smoke.mp4'
 $discoveryPath = Join-Path $env:TEMP 'kdenlive-open-agent.json'
 
 $diagnostics = Join-Path (Get-Location) 'artifacts/smoke/functional'
@@ -138,6 +139,89 @@ function Wait-ProjectLoaded {
     }
 
     throw "Project did not become ready in the native tool registry. Last state: $($last | Out-String)"
+}
+
+
+function Wait-RenderFinished {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaseUrl,
+        [Parameter(Mandatory = $true)][string]$Token,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [int]$TimeoutSeconds = 240
+    )
+
+    $expectedLeaf = [System.IO.Path]::GetFileName($OutputPath)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $last = $null
+
+    while ((Get-Date) -lt $deadline) {
+        Assert-SmokeProcessRunning -Process $appProcess -Stage $stage
+        $last = Invoke-AgentTool -BaseUrl $BaseUrl -Token $Token -Name 'kdenlive_render_status'
+        $job = @($last.jobs | Where-Object {
+            $_.output_file -and [System.IO.Path]::GetFileName("$($_.output_file)") -eq $expectedLeaf
+        } | Select-Object -Last 1)
+
+        if ($job.Count -gt 0) {
+            $state = "$($job[0].status)"
+            if ($state -eq 'finished') {
+                return [pscustomobject]@{ status = $last; job = $job[0] }
+            }
+            if ($state -in @('failed', 'aborted')) {
+                throw "Render job ended in state '$state': $($job[0] | ConvertTo-Json -Depth 10 -Compress)"
+            }
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    throw "Render did not finish within $TimeoutSeconds seconds. Last state: $($last | ConvertTo-Json -Depth 20 -Compress)"
+}
+
+function Test-PackagedRenderedMedia {
+    param(
+        [Parameter(Mandatory = $true)][string]$PortableRoot,
+        [Parameter(Mandatory = $true)][string]$MediaPath
+    )
+
+    if (-not (Test-Path $MediaPath -PathType Leaf)) {
+        throw "Rendered media was not created: $MediaPath"
+    }
+    $media = Get-Item $MediaPath
+    if ($media.Length -lt 4096) {
+        throw "Rendered media is unexpectedly small: $($media.Length) bytes"
+    }
+
+    $ffmpeg = Get-ChildItem -LiteralPath $PortableRoot -Recurse -File -Filter 'ffmpeg.exe' -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $ffmpeg) {
+        throw "Portable package does not contain ffmpeg.exe, so rendered-media decode cannot be verified self-contained."
+    }
+
+    $decodeStdout = Join-Path $env:RUNNER_TEMP 'editaja-render-decode-stdout.txt'
+    $decodeStderr = Join-Path $env:RUNNER_TEMP 'editaja-render-decode-stderr.txt'
+    Remove-Item $decodeStdout, $decodeStderr -Force -ErrorAction SilentlyContinue
+
+    $decode = Start-Process -FilePath $ffmpeg.FullName -ArgumentList @(
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-i', $MediaPath,
+        '-map', '0:v:0?',
+        '-map', '0:a:0?',
+        '-f', 'null',
+        'NUL'
+    ) -RedirectStandardOutput $decodeStdout -RedirectStandardError $decodeStderr -PassThru -Wait
+
+    $stderr = if (Test-Path $decodeStderr) { Get-Content $decodeStderr -Raw } else { '' }
+    if ($decode.ExitCode -ne 0) {
+        throw "Packaged FFmpeg could not decode rendered media (exit $($decode.ExitCode)): $stderr"
+    }
+
+    return [pscustomobject]@{
+        decoder = $ffmpeg.FullName
+        output_path = $media.FullName
+        output_size_bytes = [int64]$media.Length
+        decode_exit_code = [int]$decode.ExitCode
+        decode_stderr = $stderr.Trim()
+    }
 }
 
 try {
@@ -326,8 +410,69 @@ try {
     }
 
     Write-Host "Project save-copy PASS: $savedProjectPath"
+
+    $stage = 'fresh_reopen_saved_copy'
+    Close-SmokeWindowGracefully -Process $appProcess
+    $appProcess = $null
+    Remove-Item $discoveryPath -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 750
+
+    $quotedSavedProject = '"' + $savedProjectPath + '"'
+    $appProcess = Start-Process -FilePath $app -ArgumentList @($quotedSavedProject) -RedirectStandardOutput $appStdout -RedirectStandardError $appStderr -PassThru
+    $discovery = Wait-AgentBridge -DiscoveryFile $discoveryPath
+    $baseUrl = "$($discovery.rest_base_url)"
+    $token = "$($discovery.token)"
+    $savedProject = Wait-ProjectLoaded -BaseUrl $baseUrl -Token $token -ExpectedPath $savedProjectPath
+
+    $reopenedTimeline = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_timeline_state' -Arguments @{ include_items = $true }
+    $reopenedClipCount = @($reopenedTimeline.items | Where-Object { $_.kind -eq 'clip' }).Count
+    if ($reopenedClipCount -ne $clipCountAfter) {
+        throw "Fresh-process reopen did not preserve timeline edit count. Expected=$clipCountAfter Actual=$reopenedClipCount"
+    }
+
+    $reopenedSubtitles = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_subtitles'
+    $reopenedMatchingSubtitle = @($reopenedSubtitles.subtitles | Where-Object { $_.text -eq $subtitleText })
+    if ($reopenedMatchingSubtitle.Count -ne 1) {
+        throw "Fresh-process reopen did not preserve the functional-smoke subtitle: $($reopenedSubtitles | ConvertTo-Json -Depth 20 -Compress)"
+    }
+    Write-Host "Fresh-process reopen PASS: clips=$reopenedClipCount subtitle='$subtitleText'."
+
+    $stage = 'render_export'
+    $renderRequest = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_render' -Arguments @{
+        output_path = $renderOutputPath
+        preset = 'MP4-H264/AAC'
+        start_seconds = 0.0
+        end_seconds = 2.5
+        embed_subtitles = $true
+        use_proxy = $false
+        two_pass = $false
+        overwrite = $true
+    } -TimeoutSeconds 60
+    if (@($renderRequest.jobs).Count -lt 1) {
+        throw "Render tool reported success but queued no jobs: $($renderRequest | ConvertTo-Json -Depth 20 -Compress)"
+    }
+
+    $renderFinished = Wait-RenderFinished -BaseUrl $baseUrl -Token $token -OutputPath $renderOutputPath -TimeoutSeconds 240
+
+    $stage = 'render_decode'
+    $decodeEvidence = Test-PackagedRenderedMedia -PortableRoot $portable.Root -MediaPath $renderOutputPath
+    New-Item -ItemType Directory -Force $diagnostics | Out-Null
+    $renderEvidence = [ordered]@{
+        captured_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        saved_project_path = $savedProject.path
+        reopened_clip_count = $reopenedClipCount
+        subtitle_text = $subtitleText
+        render_request = $renderRequest
+        render_status = $renderFinished.status
+        render_job = $renderFinished.job
+        decode = $decodeEvidence
+        pass = $true
+    }
+    $renderEvidence | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $diagnostics 'render-evidence.json') -Encoding utf8
+    Write-Host "Render/decode PASS: $($decodeEvidence.output_path) ($($decodeEvidence.output_size_bytes) bytes)."
+
     $status = 'PASS'
-    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, project load, timeline split, subtitle edit, and project save-copy.'
+    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess
