@@ -1,0 +1,176 @@
+diff --git a/src/aiassistant/aiassistantwidget.cpp b/src/aiassistant/aiassistantwidget.cpp
+index 5f44426..12c3aef 100644
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -2171,6 +2171,44 @@ void AiAssistantWidget::registerTools()
+                                  {QStringLiteral("end_frame"), integerProperty}}}});
+ 
+ 
++    registerNativeTool(
++        QStringLiteral("kdenlive_list_guides"),
++        QStringLiteral("List project timeline guides/markers with exact position, comment, category type and optional range duration."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")}, {QStringLiteral("properties"), QJsonObject{}}});
++
++    registerNativeTool(
++        QStringLiteral("kdenlive_add_guide"),
++        QStringLiteral("Add a point or range guide to the project timeline. Existing guides are protected unless overwrite=true."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"),
++                     QJsonObject{{QStringLiteral("position_frame"), integerProperty},
++                                 {QStringLiteral("position_seconds"), numberProperty},
++                                 {QStringLiteral("comment"), stringProperty},
++                                 {QStringLiteral("type"), integerProperty},
++                                 {QStringLiteral("duration_frames"), integerProperty},
++                                 {QStringLiteral("duration_seconds"), numberProperty},
++                                 {QStringLiteral("overwrite"), booleanProperty}}}});
++
++    registerNativeTool(
++        QStringLiteral("kdenlive_edit_guide"),
++        QStringLiteral("Edit or move an existing project guide by its exact current frame/time. Can convert between point and range guide."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"),
++                     QJsonObject{{QStringLiteral("position_frame"), integerProperty},
++                                 {QStringLiteral("position_seconds"), numberProperty},
++                                 {QStringLiteral("new_position_frame"), integerProperty},
++                                 {QStringLiteral("new_position_seconds"), numberProperty},
++                                 {QStringLiteral("comment"), stringProperty},
++                                 {QStringLiteral("type"), integerProperty},
++                                 {QStringLiteral("duration_frames"), integerProperty},
++                                 {QStringLiteral("duration_seconds"), numberProperty}}}});
++
++    registerNativeTool(
++        QStringLiteral("kdenlive_delete_guide"),
++        QStringLiteral("Delete a project timeline guide at an exact frame or time in seconds."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"), frameOrSecondsProperties}});
++
+     registerNativeTool(
+         QStringLiteral("kdenlive_get_scene_map"),
+         QStringLiteral("Read Scene Detection markers (Scene N) from a bin/timeline clip and map source scene ranges onto the current timeline clip."),
+diff --git a/src/mainwindow.cpp b/src/mainwindow.cpp
+index fdd6705..227e41b 100644
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -905,6 +905,122 @@ void MainWindow::init()
+             }
+ 
+ 
++            if (toolName == QLatin1String("kdenlive_list_guides")) {
++                const auto guideModel = model->getGuideModel();
++                if (!guideModel) {
++                    return errorResult(QStringLiteral("Project guide model is not available"));
++                }
++                QJsonArray guides;
++                for (const CommentedTime &guide : guideModel->getAllMarkers()) {
++                    const int position = guide.time().frames(fps);
++                    const int duration = qMax(0, guide.duration().frames(fps));
++                    guides.push_back(QJsonObject{{QStringLiteral("position_frame"), position},
++                                                 {QStringLiteral("position_seconds"), position / fps},
++                                                 {QStringLiteral("comment"), guide.comment()},
++                                                 {QStringLiteral("type"), guide.markerType()},
++                                                 {QStringLiteral("has_range"), guide.hasRange()},
++                                                 {QStringLiteral("duration_frames"), duration},
++                                                 {QStringLiteral("duration_seconds"), duration / fps},
++                                                 {QStringLiteral("end_frame"), position + duration}});
++                }
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("count"), guides.size()},
++                                   {QStringLiteral("guides"), guides}};
++            }
++
++            if (toolName == QLatin1String("kdenlive_add_guide")) {
++                const int position = frameFrom(arguments, QStringLiteral("position_frame"), QStringLiteral("position_seconds"));
++                const int duration = frameFrom(arguments, QStringLiteral("duration_frames"), QStringLiteral("duration_seconds"), 0);
++                if (position < 0 || duration < 0) {
++                    return errorResult(QStringLiteral("A non-negative guide position and duration are required"));
++                }
++                const auto guideModel = model->getGuideModel();
++                if (!guideModel) {
++                    return errorResult(QStringLiteral("Project guide model is not available"));
++                }
++                const bool overwrite = arguments.value(QStringLiteral("overwrite")).toBool(false);
++                if (guideModel->hasMarker(position) && !overwrite) {
++                    return errorResult(QStringLiteral("A guide already exists at this frame; set overwrite=true to replace it"));
++                }
++                const QString comment = arguments.value(QStringLiteral("comment")).toString();
++                const int type = arguments.contains(QStringLiteral("type")) ? arguments.value(QStringLiteral("type")).toInt(-1) : -1;
++                if (type != -1 && !pCore->markerTypes.contains(type)) {
++                    return errorResult(QStringLiteral("Unknown guide category type"));
++                }
++                const bool success = duration > 0
++                    ? guideModel->addRangeMarker(GenTime(position, fps), GenTime(duration, fps), comment, type)
++                    : guideModel->addMarker(GenTime(position, fps), comment, type);
++                if (!success) {
++                    return errorResult(QStringLiteral("Kdenlive rejected the guide creation"));
++                }
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("operation"), toolName},
++                                   {QStringLiteral("position_frame"), position},
++                                   {QStringLiteral("duration_frames"), duration},
++                                   {QStringLiteral("comment"), comment},
++                                   {QStringLiteral("type"), type}};
++            }
++
++            if (toolName == QLatin1String("kdenlive_edit_guide")) {
++                const int position = frameFrom(arguments, QStringLiteral("position_frame"), QStringLiteral("position_seconds"));
++                if (position < 0) {
++                    return errorResult(QStringLiteral("A non-negative existing guide position is required"));
++                }
++                const auto guideModel = model->getGuideModel();
++                if (!guideModel) {
++                    return errorResult(QStringLiteral("Project guide model is not available"));
++                }
++                bool found = false;
++                const CommentedTime current = guideModel->getMarker(position, &found);
++                if (!found) {
++                    return errorResult(QStringLiteral("No guide exists at the requested frame"));
++                }
++                const int newPosition = frameFrom(arguments, QStringLiteral("new_position_frame"), QStringLiteral("new_position_seconds"), position);
++                const int currentDuration = qMax(0, current.duration().frames(fps));
++                const int duration = frameFrom(arguments, QStringLiteral("duration_frames"), QStringLiteral("duration_seconds"), currentDuration);
++                if (newPosition < 0 || duration < 0) {
++                    return errorResult(QStringLiteral("New guide position and duration must be non-negative"));
++                }
++                if (newPosition != position && guideModel->hasMarker(newPosition)) {
++                    return errorResult(QStringLiteral("Another guide already exists at the new frame"));
++                }
++                const QString comment = arguments.contains(QStringLiteral("comment")) ? arguments.value(QStringLiteral("comment")).toString() : current.comment();
++                const int type = arguments.contains(QStringLiteral("type")) ? arguments.value(QStringLiteral("type")).toInt(current.markerType()) : current.markerType();
++                if (!pCore->markerTypes.contains(type)) {
++                    return errorResult(QStringLiteral("Unknown guide category type"));
++                }
++                if (!guideModel->editMarker(GenTime(position, fps), GenTime(newPosition, fps), comment, type, GenTime(duration, fps))) {
++                    return errorResult(QStringLiteral("Kdenlive rejected the guide edit"));
++                }
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("operation"), toolName},
++                                   {QStringLiteral("old_position_frame"), position},
++                                   {QStringLiteral("position_frame"), newPosition},
++                                   {QStringLiteral("duration_frames"), duration},
++                                   {QStringLiteral("comment"), comment},
++                                   {QStringLiteral("type"), type}};
++            }
++
++            if (toolName == QLatin1String("kdenlive_delete_guide")) {
++                const int position = frameFrom(arguments, QStringLiteral("position_frame"), QStringLiteral("position_seconds"));
++                if (position < 0) {
++                    return errorResult(QStringLiteral("A non-negative guide position is required"));
++                }
++                const auto guideModel = model->getGuideModel();
++                if (!guideModel) {
++                    return errorResult(QStringLiteral("Project guide model is not available"));
++                }
++                if (!guideModel->hasMarker(position)) {
++                    return errorResult(QStringLiteral("No guide exists at the requested frame"));
++                }
++                if (!guideModel->removeMarker(GenTime(position, fps))) {
++                    return errorResult(QStringLiteral("Kdenlive rejected the guide deletion"));
++                }
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("operation"), toolName},
++                                   {QStringLiteral("position_frame"), position}};
++            }
++
+             if (toolName == QLatin1String("kdenlive_get_scene_map")) {
+                 const int timelineClipId = arguments.value(QStringLiteral("clip_id")).toInt(-1);
+                 QString binId = arguments.value(QStringLiteral("bin_id")).toString().trimmed();
