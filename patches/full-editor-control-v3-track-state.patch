@@ -103,15 +103,19 @@ index 8508709..92027df 100644
 +
 +                if (audio && arguments.contains(QStringLiteral("muted"))) {
 +                    const bool desired = arguments.value(QStringLiteral("muted")).toBool();
-+                    if (model->getTrackById_const(trackId)->isMute() != desired) {
-+                        controller->hideTrack(trackId, desired, false);
++                    const bool current = model->getTrackById_const(trackId)->isMute();
++                    if (current != desired) {
++                        // TimelineController::hideTrack is a UI toggle helper and expects the current disabled state.
++                        controller->hideTrack(trackId, current, false);
 +                        changedFields.push_back(QStringLiteral("muted"));
 +                    }
 +                }
 +                if (!audio && arguments.contains(QStringLiteral("hidden"))) {
 +                    const bool desired = arguments.value(QStringLiteral("hidden")).toBool();
-+                    if (model->getTrackById_const(trackId)->isHidden() != desired) {
-+                        controller->hideTrack(trackId, desired, false);
++                    const bool current = model->getTrackById_const(trackId)->isHidden();
++                    if (current != desired) {
++                        // TimelineController::hideTrack is a UI toggle helper and expects the current disabled state.
++                        controller->hideTrack(trackId, current, false);
 +                        changedFields.push_back(QStringLiteral("hidden"));
 +                    }
 +                }
