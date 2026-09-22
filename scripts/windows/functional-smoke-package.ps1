@@ -231,7 +231,13 @@ function Test-PackagedRenderedMedia {
         'NUL'
     ) -RedirectStandardOutput $decodeStdout -RedirectStandardError $decodeStderr -PassThru -Wait
 
-    $stderr = if (Test-Path $decodeStderr) { Get-Content $decodeStderr -Raw } else { '' }
+    # Get-Content -Raw returns $null for an existing empty file. A clean
+    # FFmpeg decode normally leaves stderr empty, so normalize that success path
+    # to a real string before persisting evidence.
+    $stderr = if (Test-Path $decodeStderr) { [string](Get-Content $decodeStderr -Raw) } else { '' }
+    if ($null -eq $stderr) {
+        $stderr = ''
+    }
     if ($decode.ExitCode -ne 0) {
         throw "Packaged FFmpeg could not decode rendered media (exit $($decode.ExitCode)): $stderr"
     }
