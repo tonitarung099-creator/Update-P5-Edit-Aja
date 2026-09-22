@@ -1,0 +1,144 @@
+diff --git a/src/aiassistant/aiassistantwidget.cpp b/src/aiassistant/aiassistantwidget.cpp
+index 14fed4e..247bb84 100644
+--- a/src/aiassistant/aiassistantwidget.cpp
++++ b/src/aiassistant/aiassistantwidget.cpp
+@@ -2226,6 +2226,27 @@ void AiAssistantWidget::registerTools()
+                     {QStringLiteral("properties"), QJsonObject{{QStringLiteral("track_id"), integerProperty}}},
+                     {QStringLiteral("required"), QJsonArray{QStringLiteral("track_id")}}});
+ 
++    registerNativeTool(
++        QStringLiteral("kdenlive_get_track_state"),
++        QStringLiteral("Read exact state of one timeline track: name, type, lock, active state, mute/hide state and effect-stack state."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"), QJsonObject{{QStringLiteral("track_id"), integerProperty}}},
++                    {QStringLiteral("required"), QJsonArray{QStringLiteral("track_id")}}});
++
++    registerNativeTool(
++        QStringLiteral("kdenlive_set_track_state"),
++        QStringLiteral("Set explicit timeline-track state without blind toggles. Audio tracks accept muted; video tracks accept hidden."),
++        QJsonObject{{QStringLiteral("type"), QStringLiteral("object")},
++                    {QStringLiteral("properties"),
++                     QJsonObject{{QStringLiteral("track_id"), integerProperty},
++                                 {QStringLiteral("name"), stringProperty},
++                                 {QStringLiteral("locked"), booleanProperty},
++                                 {QStringLiteral("active"), booleanProperty},
++                                 {QStringLiteral("muted"), booleanProperty},
++                                 {QStringLiteral("hidden"), booleanProperty},
++                                 {QStringLiteral("effects_enabled"), booleanProperty}}},
++                    {QStringLiteral("required"), QJsonArray{QStringLiteral("track_id")}}});
++
+ 
+     registerNativeTool(
+         QStringLiteral("kdenlive_insert_composition"), QStringLiteral("Insert a Kdenlive transition/composition on a video track at an exact position."),
+diff --git a/src/mainwindow.cpp b/src/mainwindow.cpp
+index 8508709..92027df 100644
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -1319,6 +1319,107 @@ void MainWindow::init()
+                 return result;
+             }
+ 
++            if (toolName == QLatin1String("kdenlive_get_track_state")) {
++                const int trackId = arguments.value(QStringLiteral("track_id")).toInt(-1);
++                if (!model->isTrack(trackId)) {
++                    return errorResult(QStringLiteral("Unknown track_id"));
++                }
++                const auto track = model->getTrackById_const(trackId);
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("track_id"), trackId},
++                                   {QStringLiteral("position"), model->getTrackPosition(trackId)},
++                                   {QStringLiteral("audio"), track->isAudioTrack()},
++                                   {QStringLiteral("name"), model->getTrackProperty(trackId, QStringLiteral("kdenlive:track_name")).toString()},
++                                   {QStringLiteral("locked"), track->isLocked()},
++                                   {QStringLiteral("active"), track->isTimelineActive()},
++                                   {QStringLiteral("hidden"), track->isHidden()},
++                                   {QStringLiteral("muted"), track->isMute()},
++                                   {QStringLiteral("effects_enabled"), track->stackEnabled()}};
++            }
++
++            if (toolName == QLatin1String("kdenlive_set_track_state")) {
++                const int trackId = arguments.value(QStringLiteral("track_id")).toInt(-1);
++                if (!model->isTrack(trackId)) {
++                    return errorResult(QStringLiteral("Unknown track_id"));
++                }
++                const bool audio = model->isAudioTrack(trackId);
++                if (audio && arguments.contains(QStringLiteral("hidden"))) {
++                    return errorResult(QStringLiteral("hidden is only valid for video tracks; use muted for audio tracks"));
++                }
++                if (!audio && arguments.contains(QStringLiteral("muted"))) {
++                    return errorResult(QStringLiteral("muted is only valid for audio tracks; use hidden for video tracks"));
++                }
++                const bool hasRequestedState = arguments.contains(QStringLiteral("name")) || arguments.contains(QStringLiteral("locked"))
++                    || arguments.contains(QStringLiteral("active")) || arguments.contains(QStringLiteral("muted"))
++                    || arguments.contains(QStringLiteral("hidden")) || arguments.contains(QStringLiteral("effects_enabled"));
++                if (!hasRequestedState) {
++                    return errorResult(QStringLiteral("At least one track state field is required"));
++                }
++
++                QJsonArray changedFields;
++                if (arguments.contains(QStringLiteral("name"))) {
++                    const QString desired = arguments.value(QStringLiteral("name")).toString();
++                    const QString current = model->getTrackProperty(trackId, QStringLiteral("kdenlive:track_name")).toString();
++                    if (current != desired) {
++                        model->setTrackName(trackId, desired);
++                        changedFields.push_back(QStringLiteral("name"));
++                    }
++                }
++
++                if (arguments.contains(QStringLiteral("active"))) {
++                    const bool desired = arguments.value(QStringLiteral("active")).toBool();
++                    if (model->getTrackById_const(trackId)->isTimelineActive() != desired) {
++                        controller->switchTrackActive(trackId);
++                        changedFields.push_back(QStringLiteral("active"));
++                    }
++                }
++
++                if (arguments.contains(QStringLiteral("effects_enabled"))) {
++                    const bool desired = arguments.value(QStringLiteral("effects_enabled")).toBool();
++                    if (model->getTrackById_const(trackId)->stackEnabled() != desired) {
++                        model->setTrackStackEnabled(trackId, desired);
++                        changedFields.push_back(QStringLiteral("effects_enabled"));
++                    }
++                }
++
++                if (audio && arguments.contains(QStringLiteral("muted"))) {
++                    const bool desired = arguments.value(QStringLiteral("muted")).toBool();
++                    if (model->getTrackById_const(trackId)->isMute() != desired) {
++                        controller->hideTrack(trackId, desired, false);
++                        changedFields.push_back(QStringLiteral("muted"));
++                    }
++                }
++                if (!audio && arguments.contains(QStringLiteral("hidden"))) {
++                    const bool desired = arguments.value(QStringLiteral("hidden")).toBool();
++                    if (model->getTrackById_const(trackId)->isHidden() != desired) {
++                        controller->hideTrack(trackId, desired, false);
++                        changedFields.push_back(QStringLiteral("hidden"));
++                    }
++                }
++
++                if (arguments.contains(QStringLiteral("locked"))) {
++                    const bool desired = arguments.value(QStringLiteral("locked")).toBool();
++                    if (model->getTrackById_const(trackId)->isLocked() != desired) {
++                        model->setTrackLockedState(trackId, desired);
++                        changedFields.push_back(QStringLiteral("locked"));
++                    }
++                }
++
++                const auto finalTrack = model->getTrackById_const(trackId);
++                return QJsonObject{{QStringLiteral("ok"), true},
++                                   {QStringLiteral("operation"), toolName},
++                                   {QStringLiteral("track_id"), trackId},
++                                   {QStringLiteral("position"), model->getTrackPosition(trackId)},
++                                   {QStringLiteral("audio"), finalTrack->isAudioTrack()},
++                                   {QStringLiteral("name"), model->getTrackProperty(trackId, QStringLiteral("kdenlive:track_name")).toString()},
++                                   {QStringLiteral("locked"), finalTrack->isLocked()},
++                                   {QStringLiteral("active"), finalTrack->isTimelineActive()},
++                                   {QStringLiteral("hidden"), finalTrack->isHidden()},
++                                   {QStringLiteral("muted"), finalTrack->isMute()},
++                                   {QStringLiteral("effects_enabled"), finalTrack->stackEnabled()},
++                                   {QStringLiteral("changed_fields"), changedFields}};
++            }
++
+ 
+             if (toolName == QLatin1String("kdenlive_insert_composition")) {
+                 const int trackId = arguments.value(QStringLiteral("track_id")).toInt(-1);
