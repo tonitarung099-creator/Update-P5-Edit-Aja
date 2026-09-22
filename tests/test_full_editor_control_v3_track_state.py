@@ -29,6 +29,7 @@ class FullEditorControlV3TrackStateTests(unittest.TestCase):
             "track->isHidden()",
             "track->isMute()",
             "track->stackEnabled()",
+            'audio ? QStringLiteral("muted") : QStringLiteral("hidden")',
         ):
             self.assertIn(marker, self.patch)
 
