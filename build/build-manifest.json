@@ -296,6 +296,13 @@
       "strip": 1,
       "check": true,
       "ignore_space_change": true
+    },
+    {
+      "name": "full-editor-control-v3-track-state",
+      "path": "patches/full-editor-control-v3-track-state.patch",
+      "strip": 1,
+      "check": true,
+      "ignore_space_change": true
     }
   ],
   "blueprint_payloads": [
@@ -422,6 +429,10 @@
     {
       "source": "patches/full-editor-control-v2-guides.patch",
       "destination": "craft/editaja/full-editor-control-v2-guides.patch"
+    },
+    {
+      "source": "patches/full-editor-control-v3-track-state.patch",
+      "destination": "craft/editaja/full-editor-control-v3-track-state.patch"
     }
   ]
 }
