@@ -31,6 +31,8 @@ class CreatorLayoutResetPatchTests(unittest.TestCase):
         self.assertIn("m_effectStackDock->addDockWidgetAsTab(m_aiAssistantDock);", self.patch)
         self.assertIn("m_aiAssistantDock->open();", self.patch)
         self.assertIn("m_aiAssistantDock->setAsCurrentTab();", self.patch)
+        self.assertIn("dockWindowSize.width() * 28 / 100", self.patch)
+        self.assertIn('editaja/creatorLayoutVersion"), 2', self.patch)
 
     def test_restore_changes_only_panel_arrangement(self):
         self.assertNotIn("kdenlive_cut_clip", self.patch)
