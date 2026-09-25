@@ -6,10 +6,10 @@
      bar->setFloatable(false);
 -    bar->setIconSize(QSize(20, 20));
 -    bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-+    bar->setIconSize(QSize(24, 24));
++    bar->setIconSize(QSize(20, 20));
 +    bar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
      bar->setContextMenuPolicy(Qt::PreventContextMenu);
-+    bar->setMinimumHeight(66);
++    bar->setMinimumHeight(58);
  
      auto addWorkspaceButton = [this, bar](const QString &text, const QString &iconName, const std::function<void()> &callback) {
          auto *button = new QToolButton(bar);
@@ -19,7 +19,7 @@
 +        button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
          button->setAutoRaise(true);
 -        button->setMinimumHeight(34);
-+        button->setMinimumSize(QSize(72, 54));
++        button->setMinimumSize(QSize(66, 48));
 +        button->setToolTip(text);
          connect(button, &QToolButton::clicked, this, callback);
          bar->addWidget(button);
@@ -63,7 +63,7 @@
 -    localEditInput->setPlaceholderText(i18n("Local Edit: ptong 5 · hpus sceen 73 · zom 100 ke 111 5 dtk"));
 +    localEditInput->setMinimumWidth(250);
 +    localEditInput->setMaximumWidth(420);
-+    localEditInput->setMinimumHeight(36);
++    localEditInput->setMinimumHeight(34);
 +    localEditInput->setPlaceholderText(i18n("Quick Edit: potong 5 · hapus scene 73 · zoom 100 ke 111 5 dtk"));
      localEditInput->setToolTip(i18n("Lightweight offline command bar. Simple edits use local parsing/math; complex requests are routed to AI/MCP without being sent automatically."));
      bar->addWidget(localEditInput);
@@ -73,7 +73,7 @@
      localEditPreview->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
      localEditPreview->setAutoRaise(true);
 -    localEditPreview->setMinimumHeight(34);
-+    localEditPreview->setMinimumHeight(36);
++    localEditPreview->setMinimumHeight(34);
      bar->addWidget(localEditPreview);
  
      auto *localEditRun = new QToolButton(bar);
@@ -82,7 +82,7 @@
      localEditRun->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
      localEditRun->setAutoRaise(true);
 -    localEditRun->setMinimumHeight(34);
-+    localEditRun->setMinimumHeight(36);
++    localEditRun->setMinimumHeight(34);
      bar->addWidget(localEditRun);
  
      auto previewLocalEditCommand = [this, localEditInput]() {
@@ -100,7 +100,7 @@
      exportButton->setIcon(QIcon::fromTheme(QStringLiteral("document-export")));
      exportButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 -    exportButton->setMinimumHeight(34);
-+    exportButton->setMinimumHeight(38);
++    exportButton->setMinimumHeight(36);
      connect(exportButton, &QToolButton::clicked, this, [this]() {
          if (QAction *action = actionCollection()->action(QStringLiteral("project_render"))) {
              action->trigger();
@@ -110,15 +110,17 @@
      bar->setStyleSheet(QStringLiteral(
 -        "QToolBar#creatorWorkspaceToolBar { spacing: 3px; padding: 5px 8px; border-bottom: 1px solid palette(mid); }"
 -        "QToolBar#creatorWorkspaceToolBar QToolButton { padding: 6px 10px; border-radius: 6px; }"
-+        "QToolBar#creatorWorkspaceToolBar { spacing: 3px; padding: 5px 8px; border-bottom: 1px solid palette(mid); background: palette(window); }"
-+        "QToolBar#creatorWorkspaceToolBar QToolButton { padding: 5px 9px; border-radius: 7px; }"
-         "QToolBar#creatorWorkspaceToolBar QToolButton:hover { background: palette(midlight); }"
-+        "QToolBar#creatorWorkspaceToolBar::separator { width: 1px; margin: 8px 7px; background: palette(mid); }"
-+        "QToolButton#creatorAiAgentButton { font-weight: 700; border: 1px solid palette(highlight); background: palette(midlight); }"
-+        "QToolButton#creatorAiEditButton { font-weight: 600; }"
-+        "QLineEdit#creatorLocalEditInput { padding: 7px 10px; border: 1px solid palette(mid); border-radius: 7px; background: palette(base); }"
++        "QToolBar#creatorWorkspaceToolBar { spacing: 4px; padding: 5px 10px; border-bottom: 1px solid #253247; background: #101827; color: #d9e4f2; }"
++        "QToolBar#creatorWorkspaceToolBar QToolButton { color: #dce7f5; font-size: 11px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; }"
+         "QToolBar#creatorWorkspaceToolBar QToolButton:hover { background: #1b2940; border-color: #2d4263; }"
++        "QToolBar#creatorWorkspaceToolBar QToolButton:pressed { background: #243652; }"
++        "QToolBar#creatorWorkspaceToolBar::separator { width: 1px; margin: 8px 7px; background: #2a3a52; }"
++        "QToolButton#creatorAiAgentButton { font-weight: 700; border: 1px solid #536dfe; background: #1a2540; color: #eef2ff; }"
++        "QToolButton#creatorAiEditButton { font-weight: 600; color: #cdd8ff; }"
++        "QLineEdit#creatorLocalEditInput { color: #e9f0f8; selection-background-color: #2f8fff; padding: 6px 10px; border: 1px solid #30445f; border-radius: 8px; background: #0b1220; }"
++        "QLineEdit#creatorLocalEditInput:focus { border-color: #2f8fff; }"
 +        "QToolButton#creatorLocalEditPreview, QToolButton#creatorLocalEditRun { padding-left: 10px; padding-right: 10px; }"
-+        "QToolButton#creatorLocalEditRun { font-weight: 600; }"
-         "QToolButton#creatorExportButton { font-weight: 700; background: palette(highlight); color: palette(highlighted-text); padding-left: 14px; padding-right: 14px; }"));
++        "QToolButton#creatorLocalEditRun { font-weight: 700; background: #1769e0; border-color: #2f8fff; color: white; }"
+         "QToolButton#creatorExportButton { font-weight: 700; background: #2f8fff; color: white; border-color: #66a9ff; padding-left: 14px; padding-right: 14px; }"));
  
      addToolBar(Qt::TopToolBarArea, bar);
