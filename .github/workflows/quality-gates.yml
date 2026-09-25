@@ -72,6 +72,7 @@ jobs:
               tests.test_gemini_ui_copy_patch
               tests.test_full_editor_control_patch
               tests.test_full_editor_control_v2_guides
+              tests.test_full_editor_control_v3_track_state
               tests.test_keyframe_api_compile_fix
               tests.test_phase_integration
               tests.test_workflow_presets
