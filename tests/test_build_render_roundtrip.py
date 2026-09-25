@@ -74,6 +74,29 @@ class BuildRenderRoundTripTests(unittest.TestCase):
         self.assertIn("full-editor-action-state.json", self.functional)
         self.assertIn("Full Editor Control action-state PASS", self.functional)
 
+    def test_full_editor_guides_round_trip_is_exercised(self):
+        for tool in (
+            "kdenlive_list_guides",
+            "kdenlive_add_guide",
+            "kdenlive_edit_guide",
+            "kdenlive_delete_guide",
+        ):
+            self.assertIn(f"'{tool}'", self.functional)
+
+        project_load = self.functional.index("$stage = 'project_load'")
+        guides = self.functional.index("$stage = 'full_editor_guides'")
+        timeline = self.functional.index("$stage = 'timeline_split'")
+        self.assertLess(project_load, guides)
+        self.assertLess(guides, timeline)
+
+        self.assertIn("$guideSearchLimit", self.functional)
+        self.assertIn("$occupiedGuideFrames.ContainsKey", self.functional)
+        self.assertIn("duration_frames = 10", self.functional)
+        self.assertIn("$oldGuideStillPresent.Count -ne 0", self.functional)
+        self.assertIn("$deletedGuideStillPresent.Count -ne 0", self.functional)
+        self.assertIn("full-editor-guides.json", self.functional)
+        self.assertIn("Full Editor Control guide round-trip PASS", self.functional)
+
     def test_render_evidence_is_persisted(self):
         self.assertIn("render-evidence.json", self.functional)
         self.assertIn("render_request = $renderRequest", self.functional)
