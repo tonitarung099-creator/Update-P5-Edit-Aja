@@ -22,9 +22,9 @@
 +    }
 +
 +    const QSize dockWindowSize = mainDockWindow->size();
-+    const QSize timelineSize(0, qMax(260, dockWindowSize.height() * 44 / 100));
-+    const QSize binSize(qMax(280, dockWindowSize.width() * 23 / 100), qMax(320, dockWindowSize.height() * 54 / 100));
-+    const QSize sidebarSize(qMax(340, dockWindowSize.width() * 26 / 100), qMax(320, dockWindowSize.height() * 54 / 100));
++    const QSize timelineSize(0, qMax(270, dockWindowSize.height() * 45 / 100));
++    const QSize binSize(qMax(270, dockWindowSize.width() * 22 / 100), qMax(320, dockWindowSize.height() * 53 / 100));
++    const QSize sidebarSize(qMax(350, dockWindowSize.width() * 28 / 100), qMax(320, dockWindowSize.height() * 53 / 100));
 +
 +    if (m_clipMonitorDock) {
 +        m_clipMonitorDock->close();
@@ -53,7 +53,7 @@
 +    }
 +
 +    QSettings editAjaSettings;
-+    editAjaSettings.setValue(QStringLiteral("editaja/creatorLayoutVersion"), 1);
++    editAjaSettings.setValue(QStringLiteral("editaja/creatorLayoutVersion"), 2);
 +}
 +
  void MainWindow::setupCreatorWorkspace()
