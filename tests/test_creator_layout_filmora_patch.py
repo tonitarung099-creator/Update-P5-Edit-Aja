@@ -20,15 +20,16 @@ class CreatorLayoutFilmoraPatchTests(unittest.TestCase):
         self.assertIn("#include <QSettings>", self.patch)
         self.assertIn('editaja/creatorLayoutVersion', self.patch)
         self.assertIn("savedCreatorLayoutVersion < creatorLayoutVersion", self.patch)
+        self.assertIn("constexpr int creatorLayoutVersion = 2", self.patch)
         self.assertIn(
             'editAjaSettings.setValue(QStringLiteral("editaja/creatorLayoutVersion"), creatorLayoutVersion);',
             self.patch,
         )
 
     def test_creator_layout_has_media_viewer_ai_and_timeline_structure(self):
-        self.assertIn("dockWindowSize.width() * 23 / 100", self.patch)
-        self.assertIn("dockWindowSize.width() * 26 / 100", self.patch)
-        self.assertIn("dockWindowSize.height() * 44 / 100", self.patch)
+        self.assertIn("dockWindowSize.width() * 22 / 100", self.patch)
+        self.assertIn("dockWindowSize.width() * 28 / 100", self.patch)
+        self.assertIn("dockWindowSize.height() * 45 / 100", self.patch)
         self.assertIn(
             "mainDockWindow->addDockWidget(m_projectBinDock, KDDockWidgets::Location_OnLeft, m_projectMonitorDock, binSize);",
             self.patch,
