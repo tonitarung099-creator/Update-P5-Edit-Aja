@@ -110,9 +110,11 @@
      bar->setStyleSheet(QStringLiteral(
 -        "QToolBar#creatorWorkspaceToolBar { spacing: 3px; padding: 5px 8px; border-bottom: 1px solid palette(mid); }"
 -        "QToolBar#creatorWorkspaceToolBar QToolButton { padding: 6px 10px; border-radius: 6px; }"
+-        "QToolBar#creatorWorkspaceToolBar QToolButton:hover { background: palette(midlight); }"
+-        "QToolButton#creatorExportButton { font-weight: 700; background: palette(highlight); color: palette(highlighted-text); padding-left: 14px; padding-right: 14px; }"));
 +        "QToolBar#creatorWorkspaceToolBar { spacing: 4px; padding: 5px 10px; border-bottom: 1px solid #253247; background: #101827; color: #d9e4f2; }"
 +        "QToolBar#creatorWorkspaceToolBar QToolButton { color: #dce7f5; font-size: 11px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; }"
-         "QToolBar#creatorWorkspaceToolBar QToolButton:hover { background: #1b2940; border-color: #2d4263; }"
++        "QToolBar#creatorWorkspaceToolBar QToolButton:hover { background: #1b2940; border-color: #2d4263; }"
 +        "QToolBar#creatorWorkspaceToolBar QToolButton:pressed { background: #243652; }"
 +        "QToolBar#creatorWorkspaceToolBar::separator { width: 1px; margin: 8px 7px; background: #2a3a52; }"
 +        "QToolButton#creatorAiAgentButton { font-weight: 700; border: 1px solid #536dfe; background: #1a2540; color: #eef2ff; }"
@@ -121,6 +123,6 @@
 +        "QLineEdit#creatorLocalEditInput:focus { border-color: #2f8fff; }"
 +        "QToolButton#creatorLocalEditPreview, QToolButton#creatorLocalEditRun { padding-left: 10px; padding-right: 10px; }"
 +        "QToolButton#creatorLocalEditRun { font-weight: 700; background: #1769e0; border-color: #2f8fff; color: white; }"
-         "QToolButton#creatorExportButton { font-weight: 700; background: #2f8fff; color: white; border-color: #66a9ff; padding-left: 14px; padding-right: 14px; }"));
++        "QToolButton#creatorExportButton { font-weight: 700; background: #2f8fff; color: white; border-color: #66a9ff; padding-left: 14px; padding-right: 14px; }"));
  
      addToolBar(Qt::TopToolBarArea, bar);
