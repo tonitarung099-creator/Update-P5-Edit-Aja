@@ -104,7 +104,7 @@
      connect(exportButton, &QToolButton::clicked, this, [this]() {
          if (QAction *action = actionCollection()->action(QStringLiteral("project_render"))) {
              action->trigger();
-@@ -3122,9 +3137,15 @@
+@@ -3122,9 +3137,17 @@
      bar->addWidget(exportButton);
  
      bar->setStyleSheet(QStringLiteral(
