@@ -289,6 +289,8 @@ try {
         'kdenlive_open_panel',
         'kdenlive_get_action_state',
         'kdenlive_set_action_checked',
+        'kdenlive_get_track_state',
+        'kdenlive_set_track_state',
         'kdenlive_list_guides',
         'kdenlive_add_guide',
         'kdenlive_edit_guide',
@@ -422,6 +424,49 @@ try {
 
     $stage = 'project_load'
     Write-Host "Project load PASS after restart: $($project.path), duration=$($project.duration_frames) frames."
+
+    $stage = 'full_editor_track_state'
+    $trackTimeline = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_timeline_state' -Arguments @{ include_items = $false }
+    $trackCandidates = @($trackTimeline.tracks)
+    if ($trackCandidates.Count -lt 1) {
+        throw "Functional smoke project has no timeline track for Full Editor Control track-state verification."
+    }
+
+    $trackId = [int]$trackCandidates[0].id
+    $trackBefore = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_track_state' -Arguments @{ track_id = $trackId }
+    $originalLocked = [bool]$trackBefore.locked
+    $targetLocked = -not $originalLocked
+
+    $trackSet = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_set_track_state' -Arguments @{
+        track_id = $trackId
+        locked = $targetLocked
+    }
+    $trackChanged = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_track_state' -Arguments @{ track_id = $trackId }
+    if ([bool]$trackChanged.locked -ne $targetLocked) {
+        throw "Track-state set/readback verification failed: $($trackChanged | ConvertTo-Json -Depth 12 -Compress)"
+    }
+
+    [void](Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_set_track_state' -Arguments @{
+        track_id = $trackId
+        locked = $originalLocked
+    })
+    $trackRestored = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_get_track_state' -Arguments @{ track_id = $trackId }
+    if ([bool]$trackRestored.locked -ne $originalLocked) {
+        throw "Track-state restore verification failed: $($trackRestored | ConvertTo-Json -Depth 12 -Compress)"
+    }
+
+    $trackStateEvidence = [ordered]@{
+        track_id = $trackId
+        before = $trackBefore
+        requested_locked = $targetLocked
+        setter_result = $trackSet
+        changed_state = $trackChanged
+        restored_state = $trackRestored
+        pass = ([bool]$trackChanged.locked -eq $targetLocked -and [bool]$trackRestored.locked -eq $originalLocked)
+    }
+    New-Item -ItemType Directory -Force $diagnostics | Out-Null
+    $trackStateEvidence | ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $diagnostics 'full-editor-track-state.json') -Encoding utf8
+    Write-Host "Full Editor Control track-state PASS: track $trackId locked $originalLocked -> $targetLocked -> $originalLocked."
 
     $stage = 'full_editor_guides'
     $guidesBefore = Invoke-AgentTool -BaseUrl $baseUrl -Token $token -Name 'kdenlive_list_guides'
@@ -628,7 +673,7 @@ try {
     Write-Host "Render/decode PASS: $($decodeEvidence.output_path) ($($decodeEvidence.output_size_bytes) bytes)."
 
     $status = 'PASS'
-    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, deterministic QAction state control, project guide round-trip, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
+    Write-Host 'FUNCTIONAL PORTABLE EDITOR SMOKE PASS: extracted ZIP, REST/native registry, AI Agent panel, deterministic QAction state control, deterministic track-state control, project guide round-trip, project load, timeline split, subtitle edit, project save-copy, fresh-process reopen, render/export, and packaged-media decode.'
 }
 finally {
     Stop-SmokeProcessTree -Process $appProcess
