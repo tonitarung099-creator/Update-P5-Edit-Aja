@@ -67,7 +67,7 @@ TEXT_CHECKS = [
     ("src/aiassistant/aiassistantwidget.cpp", r"setMaximumBlockCount\(120\)", "Bounded Local Edit history block count"),
     ("src/aiassistant/aiassistantwidget.cpp", r"generativelanguage\.googleapis\.com/v1beta/openai/chat/completions", "Gemini-only API endpoint"),
     ("src/aiassistant/aiassistantwidget.cpp", r"geminiApiKeyPool", "Gemini API key pool editor"),
-    ("src/aiassistant/aiassistantwidget.cpp", r"description->setText\(i18n\(\"Built-in AI Agent uses Google Gemini only", "Gemini-only primary agent copy override"),
+    ("src/aiassistant/aiassistantwidget.cpp", r"description->setText\(i18n\(\"AI Agent bawaan menggunakan Google Gemini", "Gemini-only primary agent copy override"),
     ("src/aiassistant/aiassistantwidget.cpp", r"agentGroup->setTitle\(QString\(\)\)", "AI Agent main control title cleared"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"keys\.size\(\) >= 100", "Gemini API key pool cap"),
     ("src/aiassistant/openaicompatibleagent.cpp", r"httpStatus == 429", "Gemini rate-limit rotation trigger"),

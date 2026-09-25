@@ -2,7 +2,7 @@
 +++ b/src/aiassistant/aiassistantwidget.cpp
 @@ -309,2 +309,3 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
      description->setWordWrap(true);
-+    description->setText(i18n("Built-in AI Agent uses Google Gemini only. Add up to 100 Gemini API keys in the API section; editor tools remain available through the same native tool layer."));
++    description->setText(i18n("AI Agent bawaan menggunakan Google Gemini. Tambahkan hingga 100 API key Gemini di bagian API; semua alat editor tetap memakai lapisan alat native yang sama."));
      layout->addWidget(description);
 @@ -313,2 +314,3 @@ AiAssistantWidget::AiAssistantWidget(QWidget *parent)
      agentGroup->setObjectName(QStringLiteral("aiAgentMainControl"));
