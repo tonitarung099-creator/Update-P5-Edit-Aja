@@ -24,6 +24,9 @@ class AiAgentToolboxPatchTests(unittest.TestCase):
         self.assertIn('toolBox->addItem(apiGroup, i18n("API"))', self.patch)
         self.assertIn('toolBox->addItem(mcpGroup, i18n("MCP"))', self.patch)
         self.assertIn('toolBox->addItem(aiEditGroup, i18n("AI Edit"))', self.patch)
+        self.assertIn("background: #0f1724", self.patch)
+        self.assertIn("border-color: #536dfe", self.patch)
+        self.assertIn("font-size: 11px", self.patch)
 
     def test_agent_main_control_remains_outside_toolbox(self):
         self.assertNotIn('toolBox->addItem(agentGroup', self.patch)
