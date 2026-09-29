@@ -68,6 +68,7 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
     def test_patch_precedes_gemini_pool_and_is_copied_to_craft(self):
         names = [entry["name"] for entry in self.manifest["apply_chain"]]
         bounded_index = names.index("bounded-ai-output")
+        self.assertLess(names.index("ai-agent-sidebar"), bounded_index)
         entry = self.manifest["apply_chain"][bounded_index]
         self.assertEqual(entry["name"], "bounded-ai-output")
         self.assertEqual(entry["path"], "patches/bounded-ai-output.patch")
@@ -85,6 +86,10 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
 
         chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
         self.assertIn('("bounded-ai-output.patch", 1)', chain)
+        self.assertLess(
+            chain.index('("ai-agent-sidebar.patch", 1)'),
+            chain.index('("bounded-ai-output.patch", 1)'),
+        )
         if "gemini-only-key-pool" in names:
             self.assertLess(bounded_index, names.index("gemini-only-key-pool"))
             self.assertLess(
