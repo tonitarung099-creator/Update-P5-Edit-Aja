@@ -66,14 +66,25 @@
  
      connect(m_aiEditOpenButton, &QPushButton::clicked, this, &AiAssistantWidget::chooseAiEditJson);
      connect(m_aiEditPreviewButton, &QPushButton::clicked, this, &AiAssistantWidget::previewAiEditJson);
-@@ -625,7 +632,9 @@
+@@ -625,7 +632,20 @@
          "#aiAssistantWidget QPushButton[primaryAction=\"true\"] { font-weight: 600; padding: 8px 12px; border-radius: 6px; }"
          "#aiAssistantWidget QLineEdit { padding: 7px 9px; border-radius: 6px; }"
          "#aiAssistantWidget QTextBrowser { border-radius: 6px; padding: 6px; }"
 -        "#aiAssistantWidget QGroupBox#aiAgentMainControl { font-weight: 600; margin-top: 6px; }"));
-+        "#aiAssistantWidget QGroupBox#aiAgentMainControl { font-weight: 600; margin-top: 6px; }"
-+        "#aiAssistantWidget QToolBox#aiAssistantToolbox::tab { padding: 8px 10px; font-weight: 600; }"
-+        "#aiAssistantWidget QToolBox#aiAssistantToolbox::tab:selected { background: palette(midlight); border-radius: 6px; }"));
++        "#aiAssistantWidget { background: #0f1724; color: #dce7f5; font-size: 11px; }"
++        "#aiAssistantWidget QLabel#aiAssistantTitle { color: #f7fbff; font-size: 18px; font-weight: 700; padding: 2px 0 4px 0; }"
++        "#aiAssistantWidget QScrollArea#aiAssistantScrollArea { border: 0; background: transparent; }"
++        "#aiAssistantWidget QWidget#aiAssistantContent { background: #0f1724; }"
++        "#aiAssistantWidget QGroupBox { border: 1px solid #25364d; border-radius: 10px; margin-top: 8px; padding-top: 8px; background: #121c2b; }"
++        "#aiAssistantWidget QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; color: #a9b9cd; }"
++        "#aiAssistantWidget QGroupBox#aiAgentMainControl { font-weight: 600; margin-top: 6px; border: 1px solid #31476a; background: #121e31; }"
++        "#aiAssistantWidget QLineEdit, #aiAssistantWidget QTextBrowser { color: #e8eef8; background: #0a1322; border: 1px solid #2d405a; border-radius: 8px; padding: 7px 9px; }"
++        "#aiAssistantWidget QLineEdit:focus, #aiAssistantWidget QTextBrowser:focus { border-color: #2f8fff; }"
++        "#aiAssistantWidget QPushButton { color: #e2eaf5; background: #182438; border: 1px solid #2b3e59; border-radius: 8px; padding: 7px 10px; }"
++        "#aiAssistantWidget QPushButton:hover { background: #21324d; border-color: #3d5a82; }"
++        "#aiAssistantWidget QPushButton[primaryAction=\"true\"] { background: #2f8fff; border-color: #66a9ff; color: white; font-weight: 700; }"
++        "#aiAssistantWidget QToolBox#aiAssistantToolbox::tab { color: #b9c6d6; background: #121c2b; border: 1px solid #25364d; border-radius: 8px; margin-top: 4px; padding: 8px 10px; font-weight: 600; }"
++        "#aiAssistantWidget QToolBox#aiAssistantToolbox::tab:selected { color: white; background: #1d2b43; border-color: #536dfe; }"));
  }
  
  void AiAssistantWidget::configureEditorAccess(ActionCatalogProvider actionCatalog, ActionExecutor actionExecutor, PanelCatalogProvider panelCatalog,

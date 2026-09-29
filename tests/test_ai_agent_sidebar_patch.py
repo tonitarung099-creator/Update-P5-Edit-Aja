@@ -27,7 +27,10 @@ class AiAgentSidebarPatchTests(unittest.TestCase):
         self.assertIn("#include <QScrollArea>", self.patch)
         self.assertIn('setObjectName(QStringLiteral("aiAssistantScrollArea"))', self.patch)
         self.assertIn('QGroupBox(i18n("AI Agent — Main Control")', self.patch)
-        self.assertIn("m_output->setMinimumHeight(220);", self.patch)
+        self.assertIn("setMinimumWidth(350)", self.patch)
+        self.assertIn("Perintahkan AI untuk mengedit", self.patch)
+        self.assertIn("Contoh: potong bagian hening", self.patch)
+        self.assertIn("m_output->setMinimumHeight(200);", self.patch)
 
     def test_old_default_hidden_behavior_is_removed(self):
         added = "\n".join(

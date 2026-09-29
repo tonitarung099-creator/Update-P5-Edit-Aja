@@ -16,7 +16,7 @@ index 655b8de..c7b313f 100644
      registerTools();
  
 -    auto *layout = new QVBoxLayout(this);
-+    setMinimumWidth(320);
++    setMinimumWidth(350);
 +    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 +
 +    auto *rootLayout = new QVBoxLayout(this);
@@ -47,26 +47,26 @@ index 655b8de..c7b313f 100644
 +    agentGroup->setObjectName(QStringLiteral("aiAgentMainControl"));
 +    auto *agentLayout = new QGridLayout(agentGroup);
 +
-+    auto *promptLabel = new QLabel(i18n("Tell the agent what to edit"), agentGroup);
++    auto *promptLabel = new QLabel(i18n("Perintahkan AI untuk mengedit"), agentGroup);
 +    agentLayout->addWidget(promptLabel, 0, 0, 1, 2);
 +
 +    m_prompt = new QLineEdit(agentGroup);
-+    m_prompt->setPlaceholderText(i18n("Example: remove pauses, add captions, then prepare export"));
++    m_prompt->setPlaceholderText(i18n("Contoh: potong bagian hening, buat subtitle, lalu siapkan ekspor"));
 +    m_prompt->setClearButtonEnabled(true);
 +    agentLayout->addWidget(m_prompt, 1, 0, 1, 2);
 +
-+    m_runButton = new QPushButton(i18n("Run Agent"), agentGroup);
++    m_runButton = new QPushButton(i18n("Jalankan"), agentGroup);
 +    m_runButton->setProperty("primaryAction", true);
 +    agentLayout->addWidget(m_runButton, 2, 0);
 +
-+    m_cancelButton = new QPushButton(i18n("Cancel"), agentGroup);
++    m_cancelButton = new QPushButton(i18n("Batal"), agentGroup);
 +    m_cancelButton->setEnabled(false);
 +    agentLayout->addWidget(m_cancelButton, 2, 1);
 +
 +    m_output = new QTextBrowser(agentGroup);
 +    m_output->setOpenExternalLinks(false);
-+    m_output->setMinimumHeight(220);
-+    m_output->setPlaceholderText(i18n("Agent tool calls and results will appear here."));
++    m_output->setMinimumHeight(200);
++    m_output->setPlaceholderText(i18n("Aktivitas dan hasil AI Agent akan muncul di sini."));
 +    agentLayout->addWidget(m_output, 3, 0, 1, 2);
 +
 +    layout->addWidget(agentGroup);

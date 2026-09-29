@@ -18,7 +18,7 @@ class CreatorWorkspaceFilmoraPatchTests(unittest.TestCase):
 
     def test_workspace_uses_category_buttons_with_text_under_icons(self):
         self.assertIn("Qt::ToolButtonTextUnderIcon", self.patch)
-        self.assertIn("QSize(72, 54)", self.patch)
+        self.assertIn("QSize(66, 48)", self.patch)
         self.assertIn("bar->addSeparator();", self.patch)
 
     def test_ai_agent_is_visually_prominent_without_changing_behavior(self):
@@ -27,6 +27,8 @@ class CreatorWorkspaceFilmoraPatchTests(unittest.TestCase):
         self.assertIn('m_aiAssistantDock->open();', self.patch)
         self.assertIn('m_aiAssistantDock->setAsCurrentTab();', self.patch)
         self.assertIn('QToolButton#creatorAiAgentButton', self.patch)
+        self.assertIn('#536dfe', self.patch)
+        self.assertIn('#2f8fff', self.patch)
 
     def test_quick_edit_and_export_keep_existing_actions(self):
         self.assertIn('Quick Edit: potong 5', self.patch)
@@ -34,6 +36,8 @@ class CreatorWorkspaceFilmoraPatchTests(unittest.TestCase):
         self.assertIn('creatorLocalEditRun', self.patch)
         self.assertIn('creatorExportButton', self.patch)
         self.assertIn('project_render', self.patch)
+        self.assertIn('font-size: 11px', self.patch)
+        self.assertIn('background: #101827', self.patch)
 
     def test_patch_is_ui_only(self):
         self.assertIn('--- a/src/mainwindow.cpp', self.patch)
