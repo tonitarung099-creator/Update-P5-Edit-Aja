@@ -5,6 +5,7 @@ from tests.build_contract import ROOT
 
 
 PATCH = ROOT / "patches" / "bounded-ai-output.patch"
+SIDEBAR_PATCH = ROOT / "patches" / "ai-agent-sidebar.patch"
 MANIFEST = ROOT / "build" / "build-manifest.json"
 BLUEPRINT = ROOT / "craft" / "editaja" / "editaja.py"
 
@@ -13,6 +14,7 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.patch = PATCH.read_text(encoding="utf-8")
+        cls.sidebar_patch = SIDEBAR_PATCH.read_text(encoding="utf-8")
         cls.manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         cls.blueprint = BLUEPRINT.read_text(encoding="utf-8")
 
@@ -34,6 +36,27 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
         self.assertIn("document.toPlainText()", self.patch)
         self.assertIn("toHtmlEscaped()", self.patch)
         self.assertIn("full tool data is preserved for the agent", self.patch)
+
+    def test_bounded_patch_context_matches_modern_sidebar(self):
+        sidebar_additions = "\n".join(
+            line[1:]
+            for line in self.sidebar_patch.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        bounded_context = "\n".join(
+            line[1:] if line.startswith(("+", "-")) else line
+            for line in self.patch.splitlines()
+            if not line.startswith(("+++", "---", "@@"))
+        )
+        for line in (
+            "m_output->setMinimumHeight(200);",
+            'm_output->setPlaceholderText(i18n("Aktivitas dan hasil AI Agent akan muncul di sini."));',
+        ):
+            self.assertIn(line, sidebar_additions)
+            self.assertIn(line, bounded_context)
+
+        self.assertNotIn("m_output->setMinimumHeight(220);", bounded_context)
+        self.assertNotIn("Agent tool calls and results will appear here.", bounded_context)
 
     def test_only_sidebar_display_path_is_changed(self):
         self.assertIn("--- a/src/aiassistant/aiassistantwidget.cpp", self.patch)
