@@ -97,6 +97,33 @@ class BoundedAiOutputPatchTests(unittest.TestCase):
                 chain.index('("gemini-only-key-pool.patch", 1)'),
             )
 
+    def test_post_sidebar_patch_chain_order_is_stable(self):
+        names = [entry["name"] for entry in self.manifest["apply_chain"]]
+        expected = [
+            "bounded-ai-output",
+            "gemini-only-key-pool",
+            "gemini-ui-copy",
+            "full-editor-control-v1",
+            "full-editor-control-v2-guides",
+        ]
+        for name in expected:
+            self.assertIn(name, names)
+        for before, after in zip(expected, expected[1:]):
+            self.assertLess(names.index(before), names.index(after))
+
+        chain = self.blueprint.split('self.patchToApply["editaja"] = ', 1)[1].split("\n", 1)[0]
+        expected_patch_names = [
+            "bounded-ai-output.patch",
+            "gemini-only-key-pool.patch",
+            "gemini-ui-copy.patch",
+            "full-editor-control-v1.patch",
+            "full-editor-control-v2-guides.patch",
+        ]
+        for patch_name in expected_patch_names:
+            self.assertIn(f'(\"{patch_name}\", 1)', chain)
+        for before, after in zip(expected_patch_names, expected_patch_names[1:]):
+            self.assertLess(chain.index(f'(\"{before}\", 1)'), chain.index(f'(\"{after}\", 1)'))
+
 
 if __name__ == "__main__":
     unittest.main()
