@@ -41,8 +41,8 @@
      m_output = new QTextBrowser(agentGroup);
 +    m_output->document()->setMaximumBlockCount(600);
      m_output->setOpenExternalLinks(false);
-     m_output->setMinimumHeight(220);
-     m_output->setPlaceholderText(i18n("Agent tool calls and results will appear here."));
+     m_output->setMinimumHeight(200);
+     m_output->setPlaceholderText(i18n("Aktivitas dan hasil AI Agent akan muncul di sini."));
 @@ -378,6 +400,7 @@
      historyLabel->setFont(historyFont);
      m_localEditClearHistoryButton = new QPushButton(i18n("Clear"), localEditGroup);
